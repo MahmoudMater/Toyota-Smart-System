@@ -1,5 +1,42 @@
 # Releases
 
+## [2026-08-09 16:35] Fix BullMQ claim jobId (no colons)
+
+**By:** @MahmoudMater
+
+**Requested:** Summary of prove_flow failure / fix claim timer
+
+**Changes:**
+- BullMQ custom `jobId` no longer uses `:` (`claim-…` instead) in `queue-engine.service.ts`
+- `scripts/prove_flow.sh` asserts `notified` then empty queue after WhatsApp confirm
+
+**Notes:** Restart middleware and re-run prove; flush Redis if leftover entries from the failed run.
+
+## [2026-08-09 16:12] Fix TS1272 import type for decorated signatures
+
+**By:** @MahmoudMater
+
+**Requested:** Fix type-check errors TS1272 on decorated signatures
+
+**Changes:**
+- Split value vs `import type` in gate, kiosk, sap, notifications, and queue-engine services
+
+**Notes:** `npm run type-check` passes.
+
+## [2026-08-09 16:09] NestJS middleware scaffold (events, Redis, BullMQ, kiosk)
+
+**By:** @MahmoudMater
+
+**Requested:** Implement NestJS middleware with event-driven modules, Redis, BullMQ queue, sockets for kiosks
+
+**Changes:**
+- Added `middleware/` NestJS modular monolith (LPR, SAP, Gate, Kiosk, Queue Engine, Notifications, Slots, Audit)
+- Redis + BullMQ claim timers; Socket.io `/kiosk` namespace; structured pino + audit stream
+- Rewired `kiosk-voice/kiosk-ui` session flow to middleware (TTS/STT stay on Python)
+- Unit tests for state machine + queue shift-back; `middleware/scripts/prove_flow.sh`
+
+**Notes:** Run `npm install`, `docker compose up -d`, `cp .env.example .env`, then `npm run start:dev` in `middleware/`.
+
 ## [2026-08-09 15:14] Session handoff for kiosk voice Phase 1
 
 **By:** @MahmoudMater

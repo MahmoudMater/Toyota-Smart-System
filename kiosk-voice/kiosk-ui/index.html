@@ -137,7 +137,9 @@
     <main>
       <header>
         <h1>Toyota Gate Kiosk</h1>
-        <p class="sub">Phase 1 voice pipeline test — TTS / STT / session / avatar</p>
+        <p class="sub">
+          Voice (/tts, /stt) on this server · session flow on NestJS middleware (Socket.io)
+        </p>
       </header>
 
       <div class="row">
@@ -152,8 +154,11 @@
 
         <section class="panel">
           <h2>Session</h2>
+          <label for="middlewareUrl">Middleware URL</label>
+          <input id="middlewareUrl" type="text" value="http://127.0.0.1:3000" />
           <label for="gateId">Gate ID</label>
           <input id="gateId" type="text" value="gate-1" />
+          <p class="status" id="socketStatus">Socket: disconnected</p>
           <div class="actions">
             <button id="startBtn" type="button">Start visit</button>
             <button id="yesBtn" class="ok" type="button" disabled>Yes</button>
@@ -215,6 +220,7 @@
     </main>
 
     <script src="https://unpkg.com/@rive-app/canvas@2.25.3/rive.js"></script>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script src="./avatar.js"></script>
     <script src="./app.js"></script>
   </body>

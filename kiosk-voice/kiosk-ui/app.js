@@ -17,6 +17,8 @@
   const enBtn = $("enBtn");
   const langButtons = $("langButtons");
   const gateId = $("gateId");
+  const middlewareUrl = $("middlewareUrl");
+  const socketStatus = $("socketStatus");
   const promptText = $("promptText");
   const sessionStatus = $("sessionStatus");
   const profileBox = $("profileBox");
@@ -30,6 +32,9 @@
   const recordBtn = $("recordBtn");
   const recordStatus = $("recordStatus");
   const avatarStatus = $("avatarStatus");
+
+  /** Voice service (this origin) — TTS/STT only. */
+  const VOICE_BASE = "";
 
   const avatar = new window.KioskAvatar.AvatarController({
     canvas: $("avatarCanvas"),
@@ -48,6 +53,12 @@
   let answerStream = null;
   let answerRecording = false;
   let answerBusy = false;
+  let socket = null;
+  let joinedGate = null;
+
+  function mwBase() {
+    return (middlewareUrl?.value || "http://127.0.0.1:3000").replace(/\/$/, "");
+  }
 
   function pickAudioMime() {
     const candidates = [
@@ -64,6 +75,10 @@
 
   function setRecordStatus(msg) {
     if (recordStatus) recordStatus.textContent = msg;
+  }
+
+  function setSocketStatus(msg) {
+    if (socketStatus) socketStatus.textContent = msg;
   }
 
   // Keypad
@@ -88,7 +103,7 @@
   async function speakText(text, lang = sessionLang) {
     ttsStatus.textContent = `Synthesizing (${lang})…`;
     avatar.setState("talking");
-    const res = await fetch("/tts", {
+    const res = await fetch(`${VOICE_BASE}/tts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, lang }),
@@ -105,7 +120,6 @@
     ttsStatus.textContent = "Done";
   }
 
-  /** Language for TTS of the current prompt: bilingual ask uses Arabic voice. */
   function promptTtsLang(data) {
     return data.lang || sessionLang || "en";
   }
@@ -146,21 +160,26 @@
     yesBtn.disabled = !awaitingYesNo;
     noBtn.disabled = !awaitingYesNo;
 
-    const awaitingLang = false; // Arabic / language picker disabled for now
     arBtn.disabled = true;
     enBtn.disabled = true;
     langButtons.classList.add("hidden");
 
-    recordBtn.disabled = ["done", "staff_escalation", "idle"].includes(data.state);
+    recordBtn.disabled = ["done", "staff_escalation", "idle", "not_recognized"].includes(
+      data.state
+    );
 
     const needPhone = data.state === "awaiting_phone_speech";
     keypadSection.classList.toggle("hidden", !needPhone);
 
     if (data.avatar_state) {
       avatar.setState(data.avatar_state);
-    } else if (needPhone || awaitingLang) {
+    } else if (needPhone) {
       avatar.setState("listening");
-    } else if (data.state === "done" || data.state === "staff_escalation") {
+    } else if (
+      data.state === "done" ||
+      data.state === "staff_escalation" ||
+      data.state === "not_recognized"
+    ) {
       avatar.setState("idle");
     }
   }
@@ -187,6 +206,57 @@
     }
   }
 
+  function ensureSocket() {
+    if (!window.io) {
+      setSocketStatus("Socket: socket.io client missing");
+      return null;
+    }
+    const url = mwBase();
+    if (socket && socket.io?.uri?.includes(url.replace(/^https?:\/\//, ""))) {
+      return socket;
+    }
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+    }
+    socket = window.io(`${url}/kiosk`, {
+      transports: ["websocket", "polling"],
+      autoConnect: true,
+    });
+    socket.on("connect", () => {
+      setSocketStatus(`Socket: connected (${socket.id})`);
+      joinGate();
+    });
+    socket.on("disconnect", () => {
+      setSocketStatus("Socket: disconnected");
+      joinedGate = null;
+    });
+    socket.on("connect_error", (err) => {
+      setSocketStatus(`Socket: error ${err.message || err}`);
+    });
+    socket.on("session.update", async (data) => {
+      renderSession(data);
+      await applyPromptSpeech(data);
+    });
+    return socket;
+  }
+
+  function joinGate() {
+    const g = gateId.value.trim() || "gate-1";
+    if (!socket?.connected) return;
+    socket.emit("kiosk.join", { gateId: g }, (ack) => {
+      joinedGate = g;
+      setSocketStatus(`Socket: joined gate:${g} ${ack?.ok ? "ok" : ""}`);
+    });
+  }
+
+  gateId?.addEventListener("change", () => {
+    if (socket?.connected) joinGate();
+  });
+  middlewareUrl?.addEventListener("change", () => {
+    ensureSocket();
+  });
+
   speakBtn.addEventListener("click", async () => {
     speakBtn.disabled = true;
     try {
@@ -202,10 +272,12 @@
   startBtn.addEventListener("click", async () => {
     startBtn.disabled = true;
     try {
-      const res = await fetch("/session/start", {
+      ensureSocket();
+      joinGate();
+      const res = await fetch(`${mwBase()}/session/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gate_id: gateId.value.trim() || "gate-1" }),
+        body: JSON.stringify({ gateId: gateId.value.trim() || "gate-1" }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(JSON.stringify(data));
@@ -220,7 +292,30 @@
 
   async function sendInput(payload) {
     if (!sessionId) return;
-    const res = await fetch(`/session/${sessionId}/input`, {
+    ensureSocket();
+    if (socket?.connected) {
+      return new Promise((resolve, reject) => {
+        socket.emit(
+          "session.input",
+          { ...payload, sessionId },
+          async (ack) => {
+            try {
+              if (!ack?.ok || !ack.session) {
+                reject(new Error(JSON.stringify(ack || { error: "no_ack" })));
+                return;
+              }
+              renderSession(ack.session);
+              await applyPromptSpeech(ack.session);
+              resolve(ack.session);
+            } catch (e) {
+              reject(e);
+            }
+          }
+        );
+      });
+    }
+    // REST fallback when socket is down
+    const res = await fetch(`${mwBase()}/session/${sessionId}/input`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -247,7 +342,6 @@
     sendInput({ source: "touch", phone_digits: phoneInput.value })
   );
 
-  // STT sandbox recorder
   sttRecordBtn.addEventListener("click", async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -285,7 +379,7 @@
       form.append("lang", "en");
       sttStatus.textContent =
         "Uploading / transcribing… (first Whisper load can take 1–3 minutes)";
-      const res = await fetch("/stt", { method: "POST", body: form });
+      const res = await fetch(`${VOICE_BASE}/stt`, { method: "POST", body: form });
       const data = await res.json();
       sttStatus.textContent = res.ok
         ? JSON.stringify(data, null, 2)
@@ -363,7 +457,7 @@
       form.append("audio", blob, `answer.${ext}`);
       form.append("lang", "en");
 
-      const sttRes = await fetch("/stt", { method: "POST", body: form });
+      const sttRes = await fetch(`${VOICE_BASE}/stt`, { method: "POST", body: form });
       const sttData = await sttRes.json();
       if (!sttRes.ok) {
         setRecordStatus(`STT failed: ${JSON.stringify(sttData)}`);
@@ -389,13 +483,14 @@
     }
   }
 
-  // True press-and-hold (pointer events work for mouse + touch)
   recordBtn.addEventListener("pointerdown", startAnswerRecording);
   recordBtn.addEventListener("pointerup", stopAnswerRecording);
   recordBtn.addEventListener("pointercancel", stopAnswerRecording);
   recordBtn.addEventListener("pointerleave", (ev) => {
     if (answerRecording) stopAnswerRecording(ev);
   });
-  // Avoid accidental click toggling after pointerup
   recordBtn.addEventListener("click", (ev) => ev.preventDefault());
+
+  // Connect on load
+  ensureSocket();
 })();

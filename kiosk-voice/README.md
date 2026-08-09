@@ -1,6 +1,9 @@
 # Toyota Smart Gate — Kiosk Voice Pipeline (Phase 1)
 
-On-prem TTS → STT → state machine → avatar for the gate kiosk.
+On-prem TTS → STT → avatar for the gate kiosk.
+Conversation **session state** now lives in the NestJS `middleware/` (Socket.io + Redis).
+This Python service keeps `/tts` and `/stt` only for voice; kiosk UI talks to middleware for sessions.
+
 No cloud speech APIs, no LLM for conversation logic.
 
 ## Requirements
