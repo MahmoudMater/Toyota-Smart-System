@@ -26,10 +26,24 @@ Health: `GET http://localhost:3000/health`
 | POST | `/session/start` | Manual kiosk session (test without LPR) |
 | POST | `/session/:id/input` | Touch/STT input |
 | GET | `/session/:id` | Session snapshot |
-| POST | `/slots/freed` | Slot availability webhook |
+| POST | `/slots/freed` | Single slot free → notify next |
+| GET | `/slots/available` | Available free slots + active claims |
+| PUT | `/slots/available` | Set available free slot count `{ available }` |
+| POST | `/slots/freed-batch` | Free N slots → notify up to N waiting (`{ count? }`) |
 | GET | `/queue` | Live queue entries |
 | POST | `/notifications/whatsapp/confirm` | WhatsApp claim confirm |
 | GET | `/audit/events` | Recent domain-event audit trail |
+| GET | `/demo/config` | Demo config (`claimTimeoutMs`) |
+| POST | `/demo/sap-profile` | Register fake-SAP override for a plate |
+| POST | `/demo/reset` | Clear queue/session/LPR/demo/audit keys |
+
+## Demo console
+
+With this middleware + the Python voice server (`kiosk-voice` on `:8080`):
+
+1. Open http://127.0.0.1:8080/console.html
+2. Connect → Save SAP profile → Send LPR plate → avatar greets → Yes → Free a slot → WhatsApp confirm
+3. Watch the event timeline for the full story
 
 ## Socket.io (kiosk)
 

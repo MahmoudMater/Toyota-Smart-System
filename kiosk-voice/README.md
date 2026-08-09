@@ -43,6 +43,9 @@ uvicorn app:app --host 0.0.0.0 --port 8080 --reload
 
 Open http://localhost:8080/
 
+**Demo console (CTO/CEO flow):** http://localhost:8080/console.html  
+Requires NestJS middleware on `:3000`. Simulate SAP profile + LPR plate, watch avatar, free a slot, confirm WhatsApp.
+
 ## Endpoints
 
 | Method | Path | Body | Response |

@@ -4,10 +4,12 @@ import { randomUUID } from 'crypto';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
 import {
   applyShiftBack,
-  QUEUE_ACTIVE_CLAIM_KEY,
+  QUEUE_CLAIM_KEY,
+  QUEUE_CLAIM_PATTERN,
   QUEUE_CONSECUTIVE_MISSES_KEY,
   QUEUE_ENTRY_KEY,
   QUEUE_LIST_KEY,
+  QUEUE_NOTIFY_LOCK_KEY,
   QUEUE_PLATE_KEY,
   QueueEntry,
 } from './queue.logic';
@@ -26,6 +28,12 @@ redis.call('SET', entryKey, entryJson)
 redis.call('RPUSH', listKey, entryId)
 return {1, entryId}
 `;
+
+export interface ActiveClaim {
+  entryId: string;
+  slotId: string;
+  claimJobId: string;
+}
 
 @Injectable()
 export class QueueRepository {
@@ -98,37 +106,73 @@ export class QueueRepository {
     return null;
   }
 
-  async getActiveClaim(): Promise<{
-    entryId: string;
-    slotId: string;
-    claimJobId: string;
-  } | null> {
-    const raw = await this.redis.get(QUEUE_ACTIVE_CLAIM_KEY);
+  async getActiveClaim(slotId: string): Promise<ActiveClaim | null> {
+    const raw = await this.redis.get(QUEUE_CLAIM_KEY(slotId));
     if (!raw) return null;
-    return JSON.parse(raw) as {
-      entryId: string;
-      slotId: string;
-      claimJobId: string;
-    };
+    return JSON.parse(raw) as ActiveClaim;
   }
 
-  async setActiveClaim(
-    claim: { entryId: string; slotId: string; claimJobId: string } | null,
-  ): Promise<void> {
+  async listActiveClaims(): Promise<ActiveClaim[]> {
+    const keys: string[] = [];
+    let cursor = '0';
+    do {
+      const [next, found] = await this.redis.scan(
+        cursor,
+        'MATCH',
+        QUEUE_CLAIM_PATTERN,
+        'COUNT',
+        50,
+      );
+      cursor = next;
+      keys.push(...found);
+    } while (cursor !== '0');
+
+    const claims: ActiveClaim[] = [];
+    for (const key of keys) {
+      const raw = await this.redis.get(key);
+      if (!raw) continue;
+      try {
+        claims.push(JSON.parse(raw) as ActiveClaim);
+      } catch {
+        /* skip */
+      }
+    }
+    return claims;
+  }
+
+  async setActiveClaim(claim: ActiveClaim | null, slotId?: string): Promise<void> {
     if (!claim) {
-      await this.redis.del(QUEUE_ACTIVE_CLAIM_KEY);
+      const sid = slotId;
+      if (!sid) return;
+      await this.redis.del(QUEUE_CLAIM_KEY(sid));
       return;
     }
-    await this.redis.set(QUEUE_ACTIVE_CLAIM_KEY, JSON.stringify(claim));
+    await this.redis.set(QUEUE_CLAIM_KEY(claim.slotId), JSON.stringify(claim));
   }
 
-  async getConsecutiveMisses(): Promise<number> {
-    const v = await this.redis.get(QUEUE_CONSECUTIVE_MISSES_KEY);
+  async getConsecutiveMisses(slotId: string): Promise<number> {
+    const v = await this.redis.get(QUEUE_CONSECUTIVE_MISSES_KEY(slotId));
     return v ? Number(v) : 0;
   }
 
-  async setConsecutiveMisses(n: number): Promise<void> {
-    await this.redis.set(QUEUE_CONSECUTIVE_MISSES_KEY, String(n));
+  async setConsecutiveMisses(slotId: string, n: number): Promise<void> {
+    await this.redis.set(QUEUE_CONSECUTIVE_MISSES_KEY(slotId), String(n));
+  }
+
+  /** Acquire a short lock for notify reservation (returns true if acquired). */
+  async acquireNotifyLock(ttlMs = 3000): Promise<boolean> {
+    const result = await this.redis.set(
+      QUEUE_NOTIFY_LOCK_KEY,
+      '1',
+      'PX',
+      ttlMs,
+      'NX',
+    );
+    return result === 'OK';
+  }
+
+  async releaseNotifyLock(): Promise<void> {
+    await this.redis.del(QUEUE_NOTIFY_LOCK_KEY);
   }
 
   async markNotified(
@@ -163,21 +207,25 @@ export class QueueRepository {
   async assignAndRemove(entryId: string): Promise<QueueEntry | null> {
     const entry = await this.getEntry(entryId);
     if (!entry) return null;
+    const slotId = entry.slotId;
     entry.status = 'assigned';
     await this.saveEntry(entry);
     await this.redis.lrem(QUEUE_LIST_KEY, 1, entryId);
     await this.redis.del(QUEUE_PLATE_KEY(entry.plateNumber));
-    await this.setActiveClaim(null);
-    await this.setConsecutiveMisses(0);
+    if (slotId) {
+      await this.setActiveClaim(null, slotId);
+      await this.setConsecutiveMisses(slotId, 0);
+    }
     return entry;
   }
 
   async shiftBack(
     entryId: string,
     shiftDistance: number,
-  ): Promise<{ entry: QueueEntry; newPosition: number } | null> {
+  ): Promise<{ entry: QueueEntry; newPosition: number; slotId: string | null } | null> {
     const entry = await this.getEntry(entryId);
     if (!entry) return null;
+    const slotId = entry.slotId;
     const ids = await this.listIds();
     const { next, newPosition } = applyShiftBack(ids, entryId, shiftDistance);
     const pipe = this.redis.pipeline();
@@ -191,8 +239,10 @@ export class QueueRepository {
     entry.confirmed = false;
     entry.consecutiveMisses += 1;
     pipe.set(QUEUE_ENTRY_KEY(entry.id), JSON.stringify(entry));
-    pipe.del(QUEUE_ACTIVE_CLAIM_KEY);
+    if (slotId) {
+      pipe.del(QUEUE_CLAIM_KEY(slotId));
+    }
     await pipe.exec();
-    return { entry, newPosition };
+    return { entry, newPosition, slotId };
   }
 }

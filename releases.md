@@ -1,5 +1,42 @@
 # Releases
 
+## [2026-08-09 17:15] Multi-slot free + concurrent queue notifies
+
+**By:** @MahmoudMater
+
+**Requested:** Define available free slots from console; notify N waiting customers correctly
+
+**Changes:**
+- Queue engine: per-slot claims + notify lock (N free slots → N concurrent notifies)
+- Slots API: `GET/PUT /slots/available`, `POST /slots/freed-batch`
+- Demo console: available-slots control, batch free, per-claim WhatsApp confirm + countdowns
+
+**Notes:** Restart middleware; hard-refresh console. Set available N → Free slots & notify.
+
+## [2026-08-09 17:00] Console: absolute Voice URL for TTS/STT
+
+**By:** @MahmoudMater
+
+**Requested:** Fix TTS 404 when opening console via VS Code Live Preview
+
+**Changes:**
+- Added Voice URL field (default `http://127.0.0.1:8080`); TTS/STT go through `mw-api.js` absolute URLs
+- Connect checks voice `/health` as well as middleware
+
+**Notes:** Start uvicorn on :8080; open `http://127.0.0.1:8080/console.html` (not Live Preview).
+
+## [2026-08-09 16:58] Demo console UI + DemoModule
+
+**By:** @MahmoudMater
+
+**Requested:** Configurable demo console to simulate LPR/SAP, avatar flow, queue notify for CTO/CEO demos
+
+**Changes:**
+- Middleware `DemoModule`: `POST /demo/sap-profile`, `GET /demo/config`, `POST /demo/reset`; FakeSapAdapter reads Redis overrides
+- Kiosk UI `console.html` + `console.js` + `mw-api.js` (UI service layer) for full-flow demo
+
+**Notes:** Open `http://127.0.0.1:8080/console.html` with voice server + middleware running. Demo API e2e and `prove_flow.sh` OK.
+
 ## [2026-08-09 16:35] Fix BullMQ claim jobId (no colons)
 
 **By:** @MahmoudMater

@@ -16,7 +16,6 @@ import type {
   QueueEnqueuedPayload,
   QueueNotifiedPayload,
   QueueShiftedPayload,
-  SlotFreedPayload,
 } from '../../events/domain-events';
 import { LprService } from '../lpr/lpr.service';
 import { CLAIM_TIMERS_QUEUE } from './claim-timer.types';
@@ -78,17 +77,12 @@ export class QueueEngineService {
     await this.lpr.markActive(entry.plateNumber, entry.gateId, 86_400);
   }
 
-  @OnEvent(DomainEvents.SlotFreed)
-  async onSlotFreed(payload: SlotFreedPayload): Promise<void> {
-    await this.tryNotifyNext(payload.slotId, payload.correlationId);
-  }
-
   @OnEvent(DomainEvents.QueueClaimConfirmed)
   async onClaimConfirmed(payload: QueueClaimConfirmedPayload): Promise<void> {
-    const claim = await this.repo.getActiveClaim();
+    const claim = await this.repo.getActiveClaim(payload.slotId);
     if (!claim || claim.entryId !== payload.entryId) {
       this.logger.warn(
-        { entryId: payload.entryId },
+        { entryId: payload.entryId, slotId: payload.slotId },
         'queue.claim.late_or_mismatch',
       );
       return;
@@ -97,7 +91,6 @@ export class QueueEngineService {
     const assigned = await this.repo.assignAndRemove(payload.entryId);
     if (!assigned) return;
 
-    // Cancel pending timer if possible
     if (claim.claimJobId) {
       try {
         const job = await this.claimTimers.getJob(claim.claimJobId);
@@ -118,53 +111,83 @@ export class QueueEngineService {
     await this.lpr.clearActive(assigned.plateNumber);
   }
 
-  async tryNotifyNext(slotId: string, correlationId?: string): Promise<boolean> {
-    const active = await this.repo.getActiveClaim();
-    if (active) {
-      this.logger.info({ active }, 'queue.notify.skipped_active_claim');
-      return false;
-    }
-    const next = await this.repo.peekWaiting();
-    if (!next) {
-      this.logger.info({ slotId }, 'queue.empty');
+  /**
+   * Notify the next waiting entry for this slot.
+   * Per-slot claims allow N free slots → N concurrent notifies.
+   * A short Redis lock prevents two frees from grabbing the same entry.
+   */
+  async tryNotifyNext(
+    slotId: string,
+    correlationId?: string,
+  ): Promise<boolean> {
+    const existing = await this.repo.getActiveClaim(slotId);
+    if (existing) {
+      this.logger.info(
+        { slotId, existing },
+        'queue.notify.skipped_slot_busy',
+      );
       return false;
     }
 
-    const consecutiveMisses = await this.repo.getConsecutiveMisses();
-    const delay = this.config.get('CLAIM_TIMEOUT_MS', { infer: true });
-    const jobData: ClaimTimerJobData = {
-      entryId: next.id,
-      slotId,
-      plateNumber: next.plateNumber,
-      phone: next.phone,
-      consecutiveMissesAtNotify: consecutiveMisses,
-      correlationId,
-    };
-    // BullMQ custom jobId cannot contain ':'
-    const job = await this.claimTimers.add('claim-timeout', jobData, {
-      delay,
-      removeOnComplete: true,
-      removeOnFail: 100,
-      jobId: `claim-${next.id}-${slotId}-${Date.now()}`,
-    });
+    // Retry lock a few times so batch frees don't drop notifies
+    let locked = false;
+    for (let i = 0; i < 20; i++) {
+      locked = await this.repo.acquireNotifyLock(2000);
+      if (locked) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    if (!locked) {
+      this.logger.warn({ slotId }, 'queue.notify.lock_timeout');
+      return false;
+    }
 
-    const notified = await this.repo.markNotified(
-      next,
-      slotId,
-      String(job.id),
-    );
-    const notifiedPayload: QueueNotifiedPayload = {
-      entryId: notified.id,
-      plateNumber: notified.plateNumber,
-      phone: notified.phone,
-      slotId,
-      claimJobId: String(job.id),
-      notifiedAt: notified.notifiedAt!,
-      consecutiveMisses,
-      correlationId,
-    };
-    this.events.emit(DomainEvents.QueueNotified, notifiedPayload);
-    return true;
+    try {
+      if (await this.repo.getActiveClaim(slotId)) {
+        return false;
+      }
+      const next = await this.repo.peekWaiting();
+      if (!next) {
+        this.logger.info({ slotId }, 'queue.empty');
+        return false;
+      }
+
+      const consecutiveMisses = await this.repo.getConsecutiveMisses(slotId);
+      const delay = this.config.get('CLAIM_TIMEOUT_MS', { infer: true });
+      const jobData: ClaimTimerJobData = {
+        entryId: next.id,
+        slotId,
+        plateNumber: next.plateNumber,
+        phone: next.phone,
+        consecutiveMissesAtNotify: consecutiveMisses,
+        correlationId,
+      };
+      const job = await this.claimTimers.add('claim-timeout', jobData, {
+        delay,
+        removeOnComplete: true,
+        removeOnFail: 100,
+        jobId: `claim-${next.id}-${slotId}-${Date.now()}`,
+      });
+
+      const notified = await this.repo.markNotified(
+        next,
+        slotId,
+        String(job.id),
+      );
+      const notifiedPayload: QueueNotifiedPayload = {
+        entryId: notified.id,
+        plateNumber: notified.plateNumber,
+        phone: notified.phone,
+        slotId,
+        claimJobId: String(job.id),
+        notifiedAt: notified.notifiedAt!,
+        consecutiveMisses,
+        correlationId,
+      };
+      this.events.emit(DomainEvents.QueueNotified, notifiedPayload);
+      return true;
+    } finally {
+      await this.repo.releaseNotifyLock();
+    }
   }
 
   async handleClaimTimeout(data: ClaimTimerJobData): Promise<void> {
@@ -189,7 +212,10 @@ export class QueueEngineService {
     const shifted = await this.repo.shiftBack(data.entryId, shiftDistance);
     if (!shifted) return;
 
-    await this.repo.setConsecutiveMisses(data.consecutiveMissesAtNotify + 1);
+    await this.repo.setConsecutiveMisses(
+      data.slotId,
+      data.consecutiveMissesAtNotify + 1,
+    );
 
     const shiftedPayload: QueueShiftedPayload = {
       entryId: shifted.entry.id,
@@ -201,7 +227,6 @@ export class QueueEngineService {
     };
     this.events.emit(DomainEvents.QueueShifted, shiftedPayload);
 
-    // Notify next for the same slot
     await this.tryNotifyNext(data.slotId, data.correlationId);
   }
 
@@ -209,6 +234,10 @@ export class QueueEngineService {
     const ids = await this.repo.listIds();
     const entries = await Promise.all(ids.map((id) => this.repo.getEntry(id)));
     return entries.filter(Boolean);
+  }
+
+  async listActiveClaims() {
+    return this.repo.listActiveClaims();
   }
 }
 

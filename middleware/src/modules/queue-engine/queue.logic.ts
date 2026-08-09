@@ -58,5 +58,14 @@ export const QUEUE_LIST_KEY = 'qms:queue';
 export const QUEUE_ENTRY_KEY = (id: string) => `qms:entry:${id}`;
 export const QUEUE_PLATE_KEY = (plate: string) =>
   `qms:plate:${plate.trim().toUpperCase().replace(/\s+/g, '')}`;
-export const QUEUE_ACTIVE_CLAIM_KEY = 'qms:active_claim';
-export const QUEUE_CONSECUTIVE_MISSES_KEY = 'qms:slot:consecutive_misses';
+/** Per-slot active claim (allows N concurrent notifies for N free slots). */
+export const QUEUE_CLAIM_KEY = (slotId: string) =>
+  `qms:claim:${slotId.trim()}`;
+export const QUEUE_CLAIM_PATTERN = 'qms:claim:*';
+/** Consecutive no-shows for a given slot fill cycle; resets on confirm. */
+export const QUEUE_CONSECUTIVE_MISSES_KEY = (slotId: string) =>
+  `qms:slot:${slotId.trim()}:consecutive_misses`;
+/** Short lock so parallel slot-frees don't double-claim the same queue entry. */
+export const QUEUE_NOTIFY_LOCK_KEY = 'qms:notify_lock';
+export const SLOTS_AVAILABLE_KEY = 'slots:available';
+

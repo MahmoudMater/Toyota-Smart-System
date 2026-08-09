@@ -14,6 +14,7 @@ import { QueueEngineModule } from './modules/queue-engine/queue-engine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SlotsModule } from './modules/slots/slots.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { DemoModule } from './modules/demo/demo.module';
 import { HealthController } from './health.controller';
 import { Env } from './config/env.validation';
 
@@ -51,6 +52,7 @@ import { Env } from './config/env.validation';
     NotificationsModule,
     SlotsModule,
     AuditModule,
+    DemoModule,
   ],
   controllers: [HealthController],
 })
