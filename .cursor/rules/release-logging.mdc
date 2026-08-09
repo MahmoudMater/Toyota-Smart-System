@@ -1,0 +1,47 @@
+---
+description: After every completed task that changes files, append a changelog entry to releases.md. This is a workflow rule, not file-type scoped, so it must always be active.
+globs:
+alwaysApply: true
+---
+
+# Release Logging
+
+Every time the user asks the agent to do something and the agent completes that work, append an entry to `releases.md` at the project root before ending the turn. Do not skip this step, even for small changes.
+
+## When to log
+- After **every** completed agent task that creates, edits, or deletes files (features, fixes, refactors, installs, config, docs, rules, etc.).
+- Also log when the task is primarily operational but still changes the repo (e.g. adding scripts, env examples, changelog backfills).
+- Skip logging only for pure read-only turns (answering a question / explaining code) that produced **no** file changes at all.
+
+## What to log
+Append a new entry (do not overwrite prior entries) using this format:
+
+```md
+## [YYYY-MM-DD HH:MM] <Short title of the task>
+
+**By:** @<github-username>
+
+**Requested:** <one-line summary of what the user asked for, in their words or close to it>
+
+**Changes:**
+- <bullet per meaningful change>
+- <file(s) touched, with path>
+- <any new dependencies added>
+
+**Notes:** <optional — assumptions made, follow-ups needed, known limitations>
+```
+
+## Resolving the GitHub username
+- Before writing the entry, resolve the logged-in GitHub user with: `gh api user --jq '.login'`
+- Use that value in the `**By:** @username` line (include the `@`).
+- If `gh` is unavailable or unauthenticated, fall back to `git config user.name` and still prefix with `@` when it looks like a handle; otherwise write `**By:** <name> (git)`.
+- Do not invent or hardcode a username — always resolve it at log time.
+
+## Rules for the entries
+- Newest entry goes at the **top** of the file, under the `# Releases` heading.
+- Use the actual current date/time, not a placeholder.
+- Always include the `**By:**` line with the resolved GitHub username for the session that completed the task.
+- Keep each entry concise — 3–6 bullets max. This is a changelog, not a full diff.
+- Reference file paths relative to project root (e.g. `src/components/RevenueChart.tsx`), not absolute paths.
+- If `releases.md` doesn't exist yet, create it with a `# Releases` header before appending the first entry.
+- Never remove or rewrite previous entries — this file is an append-only history.
