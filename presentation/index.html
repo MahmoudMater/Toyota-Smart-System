@@ -1,0 +1,1744 @@
+<!DOCTYPE html>
+<html lang="en" style="background:#0b0d12;color:#fff">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Toyota Smart Gate & Queue — Phase 1 Solution</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css" />
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --bg-elevated: #171b24;
+      --bg-card: #1e2430;
+      --border: rgba(255, 255, 255, 0.12);
+      --border-strong: rgba(255, 255, 255, 0.22);
+      --text: #ffffff;
+      --text-muted: #c8cedc;
+      --text-dim: #9aa3b8;
+      --accent: #ff2d3f;
+      --accent-soft: rgba(255, 45, 63, 0.18);
+      --accent-glow: rgba(255, 45, 63, 0.4);
+      --cyan: #5eefe0;
+      --cyan-soft: rgba(94, 239, 224, 0.16);
+      --amber: #ffc857;
+      --amber-soft: rgba(255, 200, 87, 0.16);
+      --font-display: "Instrument Serif", Georgia, serif;
+      --font-body: "DM Sans", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, monospace;
+    }
+
+    html, body, .reveal-viewport {
+      background: var(--bg) !important;
+      background-color: var(--bg) !important;
+      font-family: var(--font-body);
+      color: var(--text);
+    }
+
+    .reveal,
+    .reveal .slides,
+    .reveal .slides > section,
+    .reveal .slides section.present,
+    .reveal .backgrounds,
+    .reveal .slide-background,
+    .reveal .slide-background.present,
+    .reveal .slide-background-content {
+      background: var(--bg) !important;
+      background-color: var(--bg) !important;
+    }
+
+    .reveal {
+      font-family: var(--font-body);
+      font-size: 28px;
+      color: var(--text) !important;
+      font-weight: 400;
+    }
+
+    .reveal .slides {
+      text-align: left;
+      color: var(--text);
+    }
+
+    .reveal .slides section {
+      padding: 0 48px;
+      box-sizing: border-box;
+      color: var(--text);
+    }
+
+    .reveal h1, .reveal h2, .reveal h3 {
+      font-family: var(--font-display);
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: -0.02em;
+      color: #ffffff !important;
+      margin-bottom: 0.5em;
+      text-shadow: none;
+    }
+
+    .reveal h1 { font-size: 2.6em; line-height: 1.05; }
+    .reveal h2 { font-size: 1.85em; line-height: 1.15; }
+    .reveal h3 { font-size: 1.25em; line-height: 1.25; color: #d5dae6 !important; }
+
+    .reveal p, .reveal li {
+      font-size: 0.78em;
+      line-height: 1.55;
+      color: var(--text-muted) !important;
+    }
+
+    .reveal strong { color: #ffffff !important; font-weight: 600; }
+    .reveal em { font-style: italic; color: var(--cyan); }
+
+    .reveal ul, .reveal ol {
+      margin-left: 0;
+      list-style: none;
+      padding: 0;
+    }
+
+    .reveal li {
+      position: relative;
+      padding-left: 1.1em;
+      margin-bottom: 0.45em;
+    }
+
+    .reveal li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.55em;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .reveal a { color: var(--cyan); text-decoration: none; }
+
+    .reveal .progress {
+      height: 3px;
+      color: var(--accent);
+      background: rgba(255,255,255,0.06);
+    }
+
+    .reveal .controls { color: var(--accent); }
+
+    .reveal .slide-number {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      background: transparent;
+      right: 20px;
+      bottom: 16px;
+    }
+
+    /* Atmosphere */
+    .reveal::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 80% 50% at 10% -10%, rgba(235, 10, 30, 0.12), transparent 50%),
+        radial-gradient(ellipse 60% 40% at 100% 100%, rgba(61, 214, 198, 0.06), transparent 45%),
+        repeating-linear-gradient(
+          0deg,
+          transparent,
+          transparent 2px,
+          rgba(255, 255, 255, 0.01) 2px,
+          rgba(255, 255, 255, 0.01) 3px
+        );
+      z-index: 0;
+    }
+
+    /* Eyebrow / label */
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5em;
+      font-family: var(--font-mono);
+      font-size: 0.42em !important;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1em;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 18px;
+      height: 2px;
+      background: var(--accent);
+    }
+
+    /* Title slide */
+    .title-slide {
+      display: flex !important;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 100%;
+    }
+
+    .title-slide .brand-mark {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 2.5em;
+    }
+
+    .title-slide .brand-mark .logo-bar {
+      width: 4px;
+      height: 28px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    .title-slide .brand-mark span {
+      font-family: var(--font-mono);
+      font-size: 0.45em;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .title-slide h1 {
+      max-width: 14ch;
+      margin-bottom: 0.35em;
+      color: #ffffff !important;
+    }
+
+    .title-slide .subtitle {
+      font-size: 0.85em;
+      color: var(--text-muted) !important;
+      max-width: 36ch;
+      margin-bottom: 2em;
+    }
+
+    .title-meta {
+      display: flex;
+      gap: 2em;
+      font-family: var(--font-mono);
+      font-size: 0.4em !important;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      border-top: 1px solid var(--border-strong);
+      padding-top: 1.5em;
+      margin-top: auto;
+    }
+
+    .title-meta strong {
+      color: #ffffff;
+      font-weight: 500;
+    }
+
+    /* Cards / grids */
+    .card-grid {
+      display: grid;
+      gap: 1em;
+      margin-top: 1.2em;
+    }
+
+    .card-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+    .card-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .card-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1em 1.2em;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), transparent);
+      opacity: 0.8;
+    }
+
+    .card.cyan::before { background: linear-gradient(90deg, var(--cyan), transparent); }
+    .card.amber::before { background: linear-gradient(90deg, var(--amber), transparent); }
+
+    .card .card-num {
+      font-family: var(--font-mono);
+      font-size: 0.5em;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      margin-bottom: 0.6em;
+    }
+
+    .card.cyan .card-num { color: var(--cyan); }
+    .card.amber .card-num { color: var(--amber); }
+
+    .card h3 {
+      font-family: var(--font-body);
+      font-size: 0.75em !important;
+      font-weight: 600;
+      color: #ffffff !important;
+      margin: 0 0 0.4em;
+    }
+
+    .card p {
+      font-size: 0.55em !important;
+      margin: 0;
+      line-height: 1.5;
+      color: var(--text-muted) !important;
+    }
+
+    /* Problem list */
+    .problem-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8em;
+      margin-top: 1.2em;
+    }
+
+    .problem-item {
+      display: flex;
+      gap: 0.9em;
+      align-items: flex-start;
+      padding: 1em;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .problem-item .icon {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7em;
+      color: var(--accent);
+    }
+
+    .problem-item h4 {
+      font-family: var(--font-body);
+      font-size: 0.65em;
+      font-weight: 600;
+      color: #ffffff;
+      margin: 0 0 0.25em;
+    }
+
+    .problem-item p {
+      font-size: 0.5em !important;
+      margin: 0;
+      line-height: 1.45;
+      color: var(--text-muted) !important;
+    }
+
+    /* Flow steps */
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55em;
+      margin-top: 1em;
+    }
+
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 1em;
+      padding: 0.7em 1em;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .flow-step .step-n {
+      font-family: var(--font-mono);
+      font-size: 0.55em;
+      color: var(--accent);
+      min-width: 1.6em;
+      padding-top: 0.15em;
+    }
+
+    .flow-step p {
+      margin: 0;
+      font-size: 0.58em !important;
+      color: var(--text-muted);
+    }
+
+    .flow-step p strong { color: var(--text); }
+
+    .flow-step.alt { border-left-color: var(--cyan); }
+    .flow-step.alt .step-n { color: var(--cyan); }
+    .flow-step.warn { border-left-color: var(--amber); }
+    .flow-step.warn .step-n { color: var(--amber); }
+
+    /* Two column layout */
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2em;
+      align-items: start;
+      margin-top: 0.8em;
+    }
+
+    .split.uneven { grid-template-columns: 1.15fr 0.85fr; }
+
+    /* Mermaid */
+    .mermaid-wrap {
+      background: #12161f;
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 1em 1.2em;
+      margin-top: 0.8em;
+      overflow: auto;
+      max-height: 62vh;
+    }
+
+    .mermaid-wrap.tall { max-height: 68vh; }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+      font-size: 14px !important;
+      color: #ffffff !important;
+    }
+
+    .mermaid svg {
+      max-width: 100%;
+      height: auto;
+    }
+
+    /* Force readable mermaid labels — never dark-on-dark */
+    .mermaid .nodeLabel,
+    .mermaid .edgeLabel,
+    .mermaid .label,
+    .mermaid .cluster-label,
+    .mermaid foreignObject div,
+    .mermaid foreignObject span,
+    .mermaid foreignObject p {
+      color: #ffffff !important;
+    }
+
+    .mermaid .edgeLabel > div,
+    .mermaid .edgeLabel foreignObject > div,
+    .mermaid .edgeLabel span,
+    .mermaid .edgeLabel p,
+    .mermaid .edgeLabel .labelBkg {
+      background-color: #f1f5f9 !important;
+      color: #0f172a !important;
+      border-radius: 4px;
+      padding: 2px 6px !important;
+      font-weight: 700 !important;
+      font-size: 12px !important;
+      opacity: 1 !important;
+      border: 1px solid #94a3b8 !important;
+    }
+
+    .mermaid .edgeLabel {
+      opacity: 1 !important;
+    }
+
+    .mermaid .edgeLabel rect {
+      fill: #f1f5f9 !important;
+      stroke: #94a3b8 !important;
+      opacity: 1 !important;
+    }
+
+    .mermaid .edgeLabel text {
+      fill: #0f172a !important;
+    }
+
+    .mermaid .edgeLabel text,
+    .mermaid .nodeLabel text,
+    .mermaid .label text,
+    .mermaid text.actor,
+    .mermaid .messageText,
+    .mermaid .loopText,
+    .mermaid .noteText,
+    .mermaid .titleText,
+    .mermaid .sectionTitle,
+    .mermaid .taskText,
+    .mermaid .taskTextOutsideRight,
+    .mermaid .taskTextOutsideLeft {
+      fill: #ffffff !important;
+    }
+
+    .mermaid .messageLine0,
+    .mermaid .messageLine1,
+    .mermaid .flowchart-link {
+      stroke: #cbd5e1 !important;
+      stroke-width: 1.5px !important;
+    }
+
+    .mermaid marker path {
+      fill: #cbd5e1 !important;
+      stroke: #cbd5e1 !important;
+    }
+
+    /* Queue example */
+    .queue-demo {
+      display: flex;
+      flex-direction: column;
+      gap: 0.7em;
+      margin-top: 1em;
+    }
+
+    .queue-row {
+      display: flex;
+      align-items: center;
+      gap: 1em;
+    }
+
+    .queue-row .label {
+      font-family: var(--font-mono);
+      font-size: 0.4em;
+      color: var(--text-dim);
+      width: 7em;
+      flex-shrink: 0;
+      letter-spacing: 0.04em;
+    }
+
+    .queue-pills {
+      display: flex;
+      gap: 0.4em;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      font-family: var(--font-mono);
+      font-size: 0.5em;
+      padding: 0.35em 0.7em;
+      border-radius: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      color: var(--text);
+    }
+
+    .pill.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: #ff6b7a;
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .pill.confirmed {
+      background: var(--cyan-soft);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+
+    .pill.shifted {
+      opacity: 0.55;
+    }
+
+    /* Tech table */
+    .tech-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1em;
+      font-size: 0.55em;
+    }
+
+    .tech-table th {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      text-align: left;
+      padding: 0.6em 0.8em;
+      border-bottom: 1px solid var(--border-strong);
+    }
+
+    .tech-table td {
+      padding: 0.65em 0.8em;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      vertical-align: top;
+    }
+
+    .tech-table td:first-child {
+      color: var(--text);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tech-table td code {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      color: var(--cyan);
+      background: var(--cyan-soft);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+    }
+
+    /* Question cards */
+    .q-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.7em;
+      margin-top: 1em;
+    }
+
+    .q-item {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1em;
+      padding: 1em 1.2em;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      align-items: start;
+    }
+
+    .q-item .q-n {
+      font-family: var(--font-display);
+      font-size: 1.4em;
+      color: var(--accent);
+      line-height: 1;
+      padding-top: 0.05em;
+    }
+
+    .q-item h4 {
+      font-family: var(--font-body);
+      font-size: 0.7em;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 0.3em;
+    }
+
+    .q-item p {
+      font-size: 0.52em !important;
+      margin: 0;
+    }
+
+    .q-item .opts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4em;
+      margin-top: 0.5em;
+    }
+
+    .q-item .opt {
+      font-family: var(--font-mono);
+      font-size: 0.42em;
+      padding: 0.3em 0.65em;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border-strong);
+      color: var(--text-muted);
+    }
+
+    /* Timeline weeks */
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 0.5em;
+      margin-top: 1.2em;
+    }
+
+    .week {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.9em 0.7em;
+      position: relative;
+      min-height: 11em;
+    }
+
+    .week::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--accent);
+      border-radius: 8px 8px 0 0;
+      opacity: 0.7;
+    }
+
+    .week.w2::before, .week.w3::before { background: var(--cyan); }
+    .week.w4::before { background: var(--amber); }
+    .week.w5::before { background: #a78bfa; }
+    .week.w6::before { background: #34d399; }
+
+    .week .wk-label {
+      font-family: var(--font-mono);
+      font-size: 0.4em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.5em;
+    }
+
+    .week.w2 .wk-label, .week.w3 .wk-label { color: var(--cyan); }
+    .week.w4 .wk-label { color: var(--amber); }
+    .week.w5 .wk-label { color: #a78bfa; }
+    .week.w6 .wk-label { color: #34d399; }
+
+    .week h4 {
+      font-family: var(--font-body);
+      font-size: 0.5em;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 0.5em;
+      line-height: 1.3;
+    }
+
+    .week ul {
+      margin: 0;
+    }
+
+    .week li {
+      font-size: 0.38em !important;
+      padding-left: 0.9em;
+      margin-bottom: 0.35em;
+      line-height: 1.4;
+      color: var(--text-muted);
+    }
+
+    .week li::before {
+      width: 4px;
+      height: 4px;
+      top: 0.45em;
+    }
+
+    /* Phase 2 */
+    .next-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 1.5em;
+      margin-top: 1em;
+    }
+
+    .checklist {
+      list-style: none;
+      padding: 0;
+      margin: 0.8em 0 0;
+    }
+
+    .checklist li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.7em;
+      padding: 0.55em 0;
+      border-bottom: 1px solid var(--border);
+      padding-left: 0;
+      font-size: 0.55em !important;
+    }
+
+    .checklist li::before { display: none; }
+
+    .checklist .box {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid var(--accent);
+      border-radius: 3px;
+      margin-top: 0.15em;
+    }
+
+    /* Callout */
+    .callout {
+      margin-top: 1.2em;
+      padding: 0.9em 1.2em;
+      background: var(--accent-soft);
+      border: 1px solid rgba(235, 10, 30, 0.3);
+      border-radius: 8px;
+      font-size: 0.58em !important;
+      color: var(--text);
+    }
+
+    .callout strong { color: #ff6b7a; }
+
+    .tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.4em;
+      padding: 0.25em 0.6em;
+      border-radius: 4px;
+      background: var(--cyan-soft);
+      color: var(--cyan);
+      letter-spacing: 0.06em;
+      vertical-align: middle;
+      margin-left: 0.5em;
+    }
+
+    /* Reliability grid */
+    .rel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8em;
+      margin-top: 1em;
+    }
+
+    .rel-item {
+      padding: 1em 1.1em;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .rel-item h4 {
+      font-family: var(--font-body);
+      font-size: 0.65em;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 0.35em;
+      display: flex;
+      align-items: center;
+      gap: 0.5em;
+    }
+
+    .rel-item h4 .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+    }
+
+    .rel-item p {
+      font-size: 0.5em !important;
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    /* Pipeline */
+    .pipeline {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      margin-top: 1.5em;
+    }
+
+    .pipe-stage {
+      flex: 1;
+      text-align: center;
+      padding: 1.2em 0.8em;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      position: relative;
+    }
+
+    .pipe-stage:first-child { border-radius: 8px 0 0 8px; }
+    .pipe-stage:last-child { border-radius: 0 8px 8px 0; }
+
+    .pipe-stage + .pipe-stage { border-left: none; }
+
+    .pipe-stage .arrow {
+      position: absolute;
+      right: -10px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 2;
+      width: 0;
+      height: 0;
+      border-top: 8px solid transparent;
+      border-bottom: 8px solid transparent;
+      border-left: 10px solid var(--accent);
+    }
+
+    .pipe-stage:last-child .arrow { display: none; }
+
+    .pipe-stage .stage-icon {
+      font-size: 1.2em;
+      margin-bottom: 0.4em;
+    }
+
+    .pipe-stage h4 {
+      font-family: var(--font-body);
+      font-size: 0.55em;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 0.3em;
+    }
+
+    .pipe-stage p {
+      font-size: 0.42em !important;
+      margin: 0;
+      line-height: 1.4;
+    }
+
+    .pipe-note {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1em;
+      margin-top: 1.5em;
+    }
+
+    .pipe-note .side {
+      padding: 1em;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+
+    .pipe-note .side h4 {
+      font-family: var(--font-mono);
+      font-size: 0.45em;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin: 0 0 0.5em;
+    }
+
+    .pipe-note .side.onprem h4 { color: var(--cyan); }
+    .pipe-note .side.api h4 { color: var(--amber); }
+
+    .pipe-note .side p {
+      font-size: 0.5em !important;
+      margin: 0;
+    }
+
+    /* Speaker notes smaller */
+    .reveal aside.notes {
+      font-size: 16px;
+    }
+
+    /* Print / PDF */
+    @media print {
+      .reveal::before { display: none; }
+      .reveal .slides section { background: #0c0e12 !important; }
+    }
+  </style>
+</head>
+<body style="background:#0b0d12;color:#fff">
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- 1. Title -->
+      <section class="title-slide" data-auto-animate data-background-color="#0b0d12">
+        <div class="brand-mark">
+          <div class="logo-bar"></div>
+          <span>Tamkeen · Solution Proposal</span>
+        </div>
+        <h1>Toyota Smart Gate &amp; Queue</h1>
+        <p class="subtitle">Phase 1 — Kiosk AI Agent &amp; Queue Management for a single branch</p>
+        <div class="title-meta">
+          <div><strong>Audience</strong> CEO · CTO</div>
+          <div><strong>Duration</strong> 6 weeks to pilot</div>
+          <div><strong>Scope</strong> Entry gates · Shared queue</div>
+        </div>
+        <aside class="notes">
+          Open with the business outcome: faster, contactless entry and fair slot assignment —
+          not with technology. Emphasize Phase 1 is one branch, entry only.
+        </aside>
+      </section>
+
+      <!-- 2. The problem -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Context</div>
+        <h2>The problem at the gate</h2>
+        <div class="problem-list">
+          <div class="problem-item">
+            <div class="icon">01</div>
+            <div>
+              <h4>Congestion at entry</h4>
+              <p>Cars queue at the barrier while staff verify identity manually — peak hours create back-ups into the road.</p>
+            </div>
+          </div>
+          <div class="problem-item">
+            <div class="icon">02</div>
+            <div>
+              <h4>No smart check-in</h4>
+              <p>Plate recognition already exists, but there is no conversational confirmation with the driver at the kiosk.</p>
+            </div>
+          </div>
+          <div class="problem-item">
+            <div class="icon">03</div>
+            <div>
+              <h4>Blind slot availability</h4>
+              <p>Drivers enter without knowing when a garage slot will free up — waiting is unstructured.</p>
+            </div>
+          </div>
+          <div class="problem-item">
+            <div class="icon">04</div>
+            <div>
+              <h4>Poor waiting experience</h4>
+              <p>No reliable notification when a slot opens. No-shows and double-claims waste capacity.</p>
+            </div>
+          </div>
+        </div>
+        <aside class="notes">
+          Keep this short. The CTO already knows ops pain; the CEO cares about customer experience and throughput.
+        </aside>
+      </section>
+
+      <!-- 3. Solution at a glance -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Solution</div>
+        <h2>Two modules. One brain.</h2>
+        <div class="card-grid cols-2">
+          <div class="card">
+            <div class="card-num">MODULE 01</div>
+            <h3>Kiosk / AI Agent</h3>
+            <p>Voice-driven avatar at each gate. Confirms the customer after LPR + SAP lookup, captures a visit phone if the driver is not the owner, then opens the gate and enqueues them.</p>
+          </div>
+          <div class="card cyan">
+            <div class="card-num">MODULE 02</div>
+            <h3>Queue Management</h3>
+            <p>Single shared FIFO queue across all gates. When a slot frees, notifies the next customer (WhatsApp + SMS + app), with a 50-second claim window and fair no-show push-back.</p>
+          </div>
+        </div>
+        <div class="callout">
+          <strong>Middleware</strong> is the shared brain — talks to LPR cameras, SAP, kiosks, gate controllers, the slot system, and notifications. Every gate feeds one queue.
+        </div>
+        <aside class="notes">
+          Stress that we own Module 1 and 2 only. SAP and Slot Availability are existing systems we integrate with.
+        </aside>
+      </section>
+
+      <!-- 4. High-level architecture -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Architecture</div>
+        <h2>How the pieces connect</h2>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart LR
+  LPR["LPR Camera"] -->|plate| MW["Middleware"]
+  MW -->|lookup| SAP["SAP / SAB"]
+  SAP -->|webhook / client record| MW
+  MW -->|profile push| Kiosk["Kiosk Avatar"]
+  Kiosk -->|confirm / phone| MW
+  MW -->|open| Gate["Gate Controller"]
+  MW -->|enqueue| QE["Queue Engine"]
+  Slot["Slot Availability"] -->|slot free| MW
+  MW -->|claim next| QE
+  MW -->|notify| Notif["WhatsApp · SMS · App"]
+  Notif -->|WhatsApp confirm| MW
+
+  classDef core fill:#3a1520,stroke:#ff2d3f,color:#ffffff,stroke-width:2px
+  classDef ext fill:#0f2f2c,stroke:#5eefe0,color:#ffffff,stroke-width:2px
+  classDef device fill:#3a2e10,stroke:#ffc857,color:#ffffff,stroke-width:2px
+  class MW,QE core
+  class SAP,Slot,Notif ext
+  class LPR,Kiosk,Gate device
+          </pre>
+        </div>
+        <aside class="notes">
+          Red = our core. Cyan = existing / external systems. Amber = physical devices at the gate.
+          Scope: single branch, multiple gates, one shared queue. Exit flow is Phase 2.
+        </aside>
+      </section>
+
+      <!-- 5. Module 1 known customer -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Module 1 · Kiosk</div>
+        <h2>Known customer — “Is that you?”</h2>
+        <div class="flow-steps">
+          <div class="flow-step">
+            <span class="step-n">01</span>
+            <p>Car approaches. <strong>LPR</strong> reads the plate and sends it to the middleware.</p>
+          </div>
+          <div class="flow-step">
+            <span class="step-n">02</span>
+            <p>Middleware looks up the plate in <strong>SAP</strong>. SAP returns (or webhooks) the customer record.</p>
+          </div>
+          <div class="flow-step">
+            <span class="step-n">03</span>
+            <p>Kiosk avatar greets by name, shows the profile, and asks: <strong>“Is this you? Is this your number?”</strong></p>
+          </div>
+          <div class="flow-step alt">
+            <span class="step-n">04</span>
+            <p><strong>Yes</strong> → gate opens. Middleware fires an enqueue event with plate, phone, gate, timestamp.</p>
+          </div>
+          <div class="flow-step warn">
+            <span class="step-n">—</span>
+            <p><strong>Plate not in SAP</strong> → not a client. Gate stays closed. Kiosk directs them to staff.</p>
+          </div>
+        </div>
+        <aside class="notes">
+          Align with design doc §2.1. Emphasize gate never opens for unknown plates — security posture for CEO.
+        </aside>
+      </section>
+
+      <!-- 6. Driver not owner -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Module 1 · Kiosk</div>
+        <h2>Driver is not the owner</h2>
+        <div class="split uneven">
+          <div class="flow-steps">
+            <div class="flow-step">
+              <span class="step-n">01</span>
+              <p>Customer says the on-file identity / number is <strong>not theirs</strong> — e.g. a personal driver.</p>
+            </div>
+            <div class="flow-step">
+              <span class="step-n">02</span>
+              <p>Avatar asks: <strong>“Are you the owner of this car?”</strong> If no → we need <em>this visit’s</em> phone.</p>
+            </div>
+            <div class="flow-step alt">
+              <span class="step-n">03</span>
+              <p>Driver <strong>speaks</strong> their phone number. Speech-to-text captures it; avatar reads it back to verify.</p>
+            </div>
+            <div class="flow-step">
+              <span class="step-n">04</span>
+              <p>On confirm → gate opens. Enqueued with the <strong>visit-only</strong> number. SAP owner record is never overwritten.</p>
+            </div>
+          </div>
+          <div class="card amber" style="align-self: stretch;">
+            <div class="card-num">WHY IT MATTERS</div>
+            <h3>Queue notifications must reach the person waiting</h3>
+            <p>The account holder’s number is useless if a driver brought the car. We capture a temporary contact for this visit only — then Module 2 can notify the right person when a slot opens.</p>
+          </div>
+        </div>
+        <aside class="notes">
+          Retry loop capped; after a few failed confirmations, ops dashboard alerts staff. Touch input can be a fallback if voice fails.
+        </aside>
+      </section>
+
+      <!-- 7. Conversation flowchart -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Module 1 · Flow</div>
+        <h2>Kiosk conversation map</h2>
+        <div class="mermaid-wrap tall">
+          <pre class="mermaid">
+flowchart TD
+  Start([Car at gate]) --> LPR[LPR reads plate]
+  LPR --> SAP{Plate in SAP?}
+  SAP -->|No| Closed[Gate stays closed<br/>See staff]
+  SAP -->|Yes| Greet[Avatar greets by name<br/>Show profile + phone]
+  Greet --> You{Is that you?}
+  You -->|Yes| ConfirmPhone{Confirm phone on file?}
+  ConfirmPhone -->|Yes| Open[Open gate]
+  ConfirmPhone -->|No| AskOwner
+  You -->|No| AskOwner{Are you the owner?}
+  AskOwner -->|Yes / wrong number| VoicePhone[Speak phone number<br/>STT capture]
+  AskOwner -->|No - driver| VoicePhone
+  VoicePhone --> ReadBack[Avatar reads number back]
+  ReadBack --> Ok{Correct?}
+  Ok -->|Yes| Open
+  Ok -->|No - retries left| VoicePhone
+  Ok -->|Retries exhausted| Staff[Alert ops / staff]
+  Open --> Enq[Enqueue visit<br/>plate · phone · gate · time]
+  Enq --> Done([In shared queue])
+
+  classDef decision fill:#3a2e10,stroke:#ffc857,color:#ffffff,stroke-width:2px
+  classDef action fill:#0f2f2c,stroke:#5eefe0,color:#ffffff,stroke-width:2px
+  classDef stop fill:#3a1520,stroke:#ff2d3f,color:#ffffff,stroke-width:2px
+  class SAP,You,ConfirmPhone,AskOwner,Ok decision
+  class LPR,Greet,VoicePhone,ReadBack,Open,Enq action
+  class Closed,Staff stop
+          </pre>
+        </div>
+      </section>
+
+      <!-- 8. Voice AI pipeline -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Module 1 · Voice AI</div>
+        <h2>The voice pipeline</h2>
+        <div class="pipeline">
+          <div class="pipe-stage">
+            <div class="stage-icon">🎙</div>
+            <h4>Speech → Text</h4>
+            <p>Capture &amp; verify spoken phone numbers and yes/no</p>
+            <div class="arrow"></div>
+          </div>
+          <div class="pipe-stage">
+            <div class="stage-icon">🧠</div>
+            <h4>LLM / Agent</h4>
+            <p>Conversation brain: greet, confirm, branch flows</p>
+            <div class="arrow"></div>
+          </div>
+          <div class="pipe-stage">
+            <div class="stage-icon">🔊</div>
+            <h4>Text → Speech</h4>
+            <p>Natural English voice replies at the kiosk</p>
+            <div class="arrow"></div>
+          </div>
+          <div class="pipe-stage">
+            <div class="stage-icon">◎</div>
+            <h4>Avatar UI</h4>
+            <p>Animated face lip-synced to audio</p>
+          </div>
+        </div>
+        <div class="pipe-note">
+          <div class="side onprem">
+            <h4>Option A · Build on-prem</h4>
+            <p>Vosk / faster-whisper + local LLM + Piper TTS. Full control, no cloud dependency, fits air-gapped branch servers. More engineering in Phase 1.</p>
+          </div>
+          <div class="side api">
+            <h4>Option B · Integrate via APIs</h4>
+            <p>Hosted STT / LLM / TTS providers behind our middleware. Faster to ship the conversation UX; needs network + vendor decision. <strong>Open question for this room.</strong></p>
+          </div>
+        </div>
+        <aside class="notes">
+          This is one of the two critical CTO decisions. Recommendation in design doc leans on-prem (Vosk, Piper) given single-branch on-prem constraint — but we need confirmation.
+        </aside>
+      </section>
+
+      <!-- 9. Module 2 overview -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Module 2 · Queue</div>
+        <h2>What the queue system does</h2>
+        <div class="card-grid cols-3">
+          <div class="card">
+            <div class="card-num">01</div>
+            <h3>Know who entered</h3>
+            <p>Every confirmed kiosk visit lands in one shared queue with plate, visit phone, gate, and timestamp.</p>
+          </div>
+          <div class="card cyan">
+            <div class="card-num">02</div>
+            <h3>Know slot capacity</h3>
+            <p>Integrates with the existing Slot Availability System — how many slots, which are free, when one opens.</p>
+          </div>
+          <div class="card amber">
+            <div class="card-num">03</div>
+            <h3>Assign fairly</h3>
+            <p>Notify next eligible customer. 50s claim window. No-shows are pushed back further each consecutive miss.</p>
+          </div>
+        </div>
+        <div class="callout" style="margin-top: 1.4em;">
+          Confirmation source of truth: <strong>WhatsApp only</strong>. SMS and Toyota app are parallel pings — they do not drive queue logic.
+        </div>
+      </section>
+
+      <!-- 10. Notification logic -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Module 2 · Logic</div>
+        <h2>50-second claim &amp; growing push-back</h2>
+        <div class="queue-demo">
+          <div class="queue-row">
+            <span class="label">Start</span>
+            <div class="queue-pills">
+              <span class="pill active">1</span>
+              <span class="pill">2</span>
+              <span class="pill">3</span>
+              <span class="pill">4</span>
+            </div>
+          </div>
+          <div class="queue-row">
+            <span class="label">1 times out</span>
+            <div class="queue-pills">
+              <span class="pill">2</span>
+              <span class="pill shifted">1</span>
+              <span class="pill">3</span>
+              <span class="pill">4</span>
+            </div>
+          </div>
+          <div class="queue-row">
+            <span class="label">2 times out</span>
+            <div class="queue-pills">
+              <span class="pill active">3</span>
+              <span class="pill shifted">1</span>
+              <span class="pill shifted">2</span>
+              <span class="pill">4</span>
+            </div>
+          </div>
+          <div class="queue-row">
+            <span class="label">3 confirms</span>
+            <div class="queue-pills">
+              <span class="pill confirmed">3 → slot</span>
+              <span class="pill">1</span>
+              <span class="pill">2</span>
+              <span class="pill">4</span>
+            </div>
+          </div>
+        </div>
+        <p style="margin-top: 1.2em; font-size: 0.55em !important;">
+          Each consecutive no-show for a slot pushes that person <strong>one position further</strong> than the previous no-show.
+          Distance resets when someone confirms. No retry cap — clients keep cycling until they claim.
+        </p>
+        <aside class="notes">
+          Walk the CEO through the pills visually. CTO cares that only one entry is `notified` per slot and that concurrent slots run parallel timers without double-claim.
+        </aside>
+      </section>
+
+      <!-- 11. Queue sequence -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Module 2 · Sequence</div>
+        <h2>Slot free → notify → claim</h2>
+        <div class="mermaid-wrap tall">
+          <pre class="mermaid">
+sequenceDiagram
+  participant Slot as Slot System
+  participant MW as Middleware
+  participant Q as Queue Engine
+  participant WA as WhatsApp
+  participant C as Customer
+
+  Slot->>MW: slot free event
+  MW->>Q: next eligible entry
+  Q-->>MW: entry #1
+  MW->>WA: notify SMS + WA + App
+  MW->>MW: start 50s timer
+  alt Confirms in time
+    C->>WA: tap confirm
+    WA->>MW: webhook confirm
+    MW->>Q: pop entry, assign slot
+  else Timeout
+    MW->>Q: push back +1 further
+    MW->>Q: next eligible entry
+    Q-->>MW: entry #2
+    Note over MW,C: Repeat notify cycle
+  end
+          </pre>
+        </div>
+      </section>
+
+      <!-- 12. Reliability -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Engineering</div>
+        <h2>Reliability across N gates</h2>
+        <div class="rel-grid">
+          <div class="rel-item">
+            <h4><span class="dot"></span> Atomic enqueue &amp; pop</h4>
+            <p>Two gates never corrupt order or double-insert. Two slot-free events never notify the same person or assign the same slot twice.</p>
+          </div>
+          <div class="rel-item">
+            <h4><span class="dot"></span> Single source of truth</h4>
+            <p>No per-gate local queues. Live state lives in Redis; Postgres holds the durable audit trail of every transition.</p>
+          </div>
+          <div class="rel-item">
+            <h4><span class="dot"></span> Idempotent events</h4>
+            <p>Plate re-reads and duplicated webhooks are de-duped by plate + active session so sensors and retries cannot double-enqueue.</p>
+          </div>
+          <div class="rel-item">
+            <h4><span class="dot"></span> Offline fallback</h4>
+            <p>If the kiosk loses middleware mid-flow, it shows “please wait / calling staff.” SAP or middleware down → gate stays closed.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 13. Tech stack -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Proposed stack</div>
+        <h2>Phase 1 technology</h2>
+        <table class="tech-table">
+          <thead>
+            <tr>
+              <th>Piece</th>
+              <th>Choice</th>
+              <th>Why</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Kiosk app</td>
+              <td><code>Android shell + WebView</code> <span class="tag">pending decision</span></td>
+              <td>Kiosk lockdown, mic/speaker; UI iterates without full redeploys. Platform TBD.</td>
+            </tr>
+            <tr>
+              <td>Voice (STT / TTS)</td>
+              <td><code>Vosk / Piper</code> or cloud APIs</td>
+              <td>On-prem default per design; API path if CTO prefers speed.</td>
+            </tr>
+            <tr>
+              <td>Middleware</td>
+              <td><code>NestJS + TypeScript</code></td>
+              <td>One codebase for both modules; strong concurrency for many gates.</td>
+            </tr>
+            <tr>
+              <td>Queue + timers</td>
+              <td><code>Redis + BullMQ</code></td>
+              <td>Atomic list ops for shift logic; delayed jobs for the 50s window.</td>
+            </tr>
+            <tr>
+              <td>Devices</td>
+              <td><code>MQTT + WebSocket</code></td>
+              <td>Cameras/gates on MQTT; kiosk live channel on Socket.io.</td>
+            </tr>
+            <tr>
+              <td>Persistence</td>
+              <td><code>PostgreSQL</code></td>
+              <td>Audit trail of notify / timeout / confirm / shift.</td>
+            </tr>
+            <tr>
+              <td>Deploy</td>
+              <td><code>Docker Compose</code> on-prem</td>
+              <td>Single-branch server — no cloud provider required for Phase 1.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- 14. Open questions -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Decisions needed</div>
+        <h2>Open questions for this room</h2>
+        <div class="q-list">
+          <div class="q-item">
+            <div class="q-n">1</div>
+            <div>
+              <h4>What is the kiosk environment?</h4>
+              <p>Hardware and OS constrain the voice stack, lockdown model, and deployment pipeline.</p>
+              <div class="opts">
+                <span class="opt">Windows</span>
+                <span class="opt">Ubuntu / Linux</span>
+                <span class="opt">Android</span>
+                <span class="opt">TBD / mixed</span>
+              </div>
+            </div>
+          </div>
+          <div class="q-item">
+            <div class="q-n">2</div>
+            <div>
+              <h4>AI agent: APIs or build the full pipeline?</h4>
+              <p>Integrate a hosted LLM + STT + TTS via APIs, or build/run the full stack on-prem and wire it into our middleware?</p>
+              <div class="opts">
+                <span class="opt">Hosted APIs</span>
+                <span class="opt">Full on-prem LLM + STT + TTS</span>
+                <span class="opt">Hybrid</span>
+              </div>
+            </div>
+          </div>
+          <div class="q-item">
+            <div class="q-n">3</div>
+            <div>
+              <h4>Slot Availability System contract?</h4>
+              <p>Does it push webhooks when a slot frees, or do we poll a “current free count” endpoint?</p>
+              <div class="opts">
+                <span class="opt">Webhook push</span>
+                <span class="opt">Polling</span>
+                <span class="opt">Unknown — need owner</span>
+              </div>
+            </div>
+          </div>
+          <div class="q-item">
+            <div class="q-n">4</div>
+            <div>
+              <h4>LPR read failure path?</h4>
+              <p>Dirty plate / glare / no read — treat like “not a client” (gate closed), or a distinct staff-assist / retry path?</p>
+              <div class="opts">
+                <span class="opt">Same as not-found</span>
+                <span class="opt">Retry + staff assist</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <aside class="notes">
+          Pause here. Capture decisions live. Questions 1 and 2 unblock kiosk sprint start; 3 unblocks queue integration; 4 is a product/security call.
+        </aside>
+      </section>
+
+      <!-- 15. 6-week timeline -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Delivery</div>
+        <h2>6-week Phase 1 plan</h2>
+        <div class="timeline">
+          <div class="week w1">
+            <div class="wk-label">Week 1</div>
+            <h4>Foundations</h4>
+            <ul>
+              <li>Infra &amp; Docker Compose</li>
+              <li>Middleware skeleton</li>
+              <li>SAP / LPR / slot contracts</li>
+              <li>Device auth model</li>
+            </ul>
+          </div>
+          <div class="week w2">
+            <div class="wk-label">Week 2</div>
+            <h4>Kiosk core</h4>
+            <ul>
+              <li>Kiosk shell + WebView</li>
+              <li>STT / TTS pipeline</li>
+              <li>Profile push channel</li>
+              <li>“Is that you?” flow</li>
+            </ul>
+          </div>
+          <div class="week w3">
+            <div class="wk-label">Week 3</div>
+            <h4>Kiosk + Queue start</h4>
+            <ul>
+              <li>Owner / driver voice phone</li>
+              <li>Gate open command</li>
+              <li>Enqueue events</li>
+              <li>Redis queue model</li>
+            </ul>
+          </div>
+          <div class="week w4">
+            <div class="wk-label">Week 4</div>
+            <h4>Queue engine</h4>
+            <ul>
+              <li>50s BullMQ timers</li>
+              <li>Push-back logic</li>
+              <li>WhatsApp confirm webhook</li>
+              <li>SMS / app pings</li>
+            </ul>
+          </div>
+          <div class="week w5">
+            <div class="wk-label">Week 5</div>
+            <h4>Integration</h4>
+            <ul>
+              <li>End-to-end gate → slot</li>
+              <li>Edge cases &amp; idempotency</li>
+              <li>Ops dashboard basics</li>
+              <li>Load / concurrency tests</li>
+            </ul>
+          </div>
+          <div class="week w6">
+            <div class="wk-label">Week 6</div>
+            <h4>Pilot</h4>
+            <ul>
+              <li>One-gate on-site pilot</li>
+              <li>Hardening &amp; fallbacks</li>
+              <li>Staff training</li>
+              <li>Handover + Phase 2 plan</li>
+            </ul>
+          </div>
+        </div>
+        <div class="mermaid-wrap" style="margin-top: 1em; max-height: none; padding: 0.8em;">
+          <pre class="mermaid">
+gantt
+  title Phase 1 — 6 weeks
+  dateFormat YYYY-MM-DD
+  axisFormat %b %d
+  section Infra
+  Middleware & contracts           :a1, 2026-08-10, 7d
+  section Kiosk
+  Voice pipeline & known-customer  :a2, after a1, 10d
+  Driver phone & gate control      :a3, after a2, 4d
+  section Queue
+  Engine, timers, notifications    :a4, 2026-08-24, 14d
+  section Launch
+  E2E, dashboard, hardening        :a5, 2026-09-07, 7d
+  One-gate pilot & handover        :a6, after a5, 7d
+          </pre>
+        </div>
+        <aside class="notes">
+          Dates are illustrative from a mid-August start — adjust to actual kickoff. Weeks 2–4 overlap intentionally: queue work starts while kiosk finishes.
+        </aside>
+      </section>
+
+      <!-- 16. Phase 2 & next steps -->
+      <section data-background-color="#0b0d12">
+        <div class="eyebrow">Next</div>
+        <h2>Phase 2 preview &amp; what we need</h2>
+        <div class="next-grid">
+          <div>
+            <h3 style="font-family: var(--font-body); font-size: 0.75em; color: var(--text); margin-bottom: 0.3em;">After Phase 1</h3>
+            <ul>
+              <li>Exit flow &amp; occupancy accuracy</li>
+              <li>Multi-branch scale-out</li>
+              <li>Analytics &amp; SLA dashboards</li>
+              <li>Arabic voice / bilingual avatar</li>
+              <li>Deeper Toyota app integration</li>
+            </ul>
+            <div class="callout" style="margin-top: 1em;">
+              Phase 1 ends with a <strong>working pilot at one gate</strong> on a single branch — enough to validate the conversation UX and the queue fairness model before scaling.
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-num">TO START</div>
+            <h3>Blockers to clear this week</h3>
+            <ul class="checklist">
+              <li><span class="box"></span> Answers to the four open questions</li>
+              <li><span class="box"></span> SAP API credentials &amp; contract</li>
+              <li><span class="box"></span> LPR camera &amp; gate controller access</li>
+              <li><span class="box"></span> Slot system owner intro</li>
+              <li><span class="box"></span> WhatsApp Business Cloud account</li>
+              <li><span class="box"></span> On-prem server / network path</li>
+              <li><span class="box"></span> Pilot gate hardware selection</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Closing -->
+      <section class="title-slide" data-background-color="#0b0d12">
+        <div class="brand-mark">
+          <div class="logo-bar"></div>
+          <span>Thank you</span>
+        </div>
+        <h1 style="max-width: 18ch;">Ready when you are.</h1>
+        <p class="subtitle">Decide the four open questions, unlock the integrations — we ship Phase 1 in six weeks.</p>
+        <div class="title-meta">
+          <div><strong>Modules</strong> Kiosk AI · Queue</div>
+          <div><strong>Horizon</strong> 6 weeks → pilot</div>
+          <div><strong>Then</strong> Phase 2 scale</div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: "dark",
+      securityLevel: "loose",
+      themeVariables: {
+        darkMode: true,
+        background: "#12161f",
+        mainBkg: "#243044",
+        primaryColor: "#243044",
+        primaryTextColor: "#ffffff",
+        primaryBorderColor: "#ff2d3f",
+        secondaryColor: "#1e293b",
+        secondaryTextColor: "#ffffff",
+        secondaryBorderColor: "#5eefe0",
+        tertiaryColor: "#334155",
+        tertiaryTextColor: "#ffffff",
+        tertiaryBorderColor: "#94a3b8",
+        lineColor: "#cbd5e1",
+        textColor: "#ffffff",
+        nodeTextColor: "#ffffff",
+        titleColor: "#ffffff",
+        edgeLabelBackground: "#334155",
+        clusterBkg: "#1e293b",
+        clusterBorder: "#64748b",
+        fontFamily: "DM Sans, sans-serif",
+        fontSize: "15px",
+        noteBkgColor: "#243044",
+        noteTextColor: "#ffffff",
+        noteBorderColor: "#5eefe0",
+        actorBkg: "#243044",
+        actorBorder: "#ff2d3f",
+        actorTextColor: "#ffffff",
+        actorLineColor: "#94a3b8",
+        signalColor: "#ffffff",
+        signalTextColor: "#ffffff",
+        labelBoxBkgColor: "#334155",
+        labelBoxBorderColor: "#94a3b8",
+        labelTextColor: "#ffffff",
+        loopTextColor: "#ffffff",
+        activationBorderColor: "#5eefe0",
+        activationBkgColor: "#1e293b",
+        sequenceNumberColor: "#0b0d12",
+        sectionBkgColor: "#243044",
+        altSectionBkgColor: "#1e293b",
+        sectionBkgColor2: "#334155",
+        taskBkgColor: "#ff2d3f",
+        taskTextColor: "#ffffff",
+        taskTextLightColor: "#ffffff",
+        taskTextOutsideColor: "#ffffff",
+        taskTextDarkColor: "#ffffff",
+        taskBorderColor: "#ff6b7a",
+        activeTaskBkgColor: "#5eefe0",
+        activeTaskBorderColor: "#5eefe0",
+        gridColor: "#475569",
+        doneTaskBkgColor: "#334155",
+        doneTaskBorderColor: "#64748b",
+        critBkgColor: "#ffc857",
+        critBorderColor: "#ffc857",
+        todayLineColor: "#5eefe0",
+        cScale0: "#ff2d3f",
+        cScale1: "#5eefe0",
+        cScale2: "#ffc857",
+      },
+      flowchart: { curve: "basis", padding: 14, htmlLabels: true },
+      sequence: { actorMargin: 40, messageMargin: 30 },
+      gantt: {
+        titleTopMargin: 10,
+        barHeight: 22,
+        barGap: 6,
+        topPadding: 40,
+        leftPadding: 100,
+        gridLineStartPadding: 10,
+        fontSize: 12,
+      },
+    });
+
+    // Force dark slide backgrounds so light headings never sit on white
+    document.querySelectorAll(".reveal .slides section").forEach((section) => {
+      section.setAttribute("data-background-color", "#0b0d12");
+    });
+
+    const deck = new Reveal({
+      hash: true,
+      slideNumber: "c/t",
+      showNotes: false,
+      transition: "fade",
+      transitionSpeed: "default",
+      backgroundTransition: "fade",
+      width: 1280,
+      height: 720,
+      margin: 0.06,
+      plugins: [RevealNotes],
+    });
+
+    function contrastFixMermaid(svgRoot) {
+      // Edge labels: light chip + dark text (highest contrast for small labels)
+      svgRoot.querySelectorAll(".edgeLabel foreignObject").forEach((fo) => {
+        const w = parseFloat(fo.getAttribute("width") || "40");
+        const h = parseFloat(fo.getAttribute("height") || "20");
+        fo.setAttribute("width", String(Math.max(w + 16, 56)));
+        fo.setAttribute("height", String(Math.max(h + 8, 28)));
+      });
+      svgRoot.querySelectorAll(".edgeLabel foreignObject div, .edgeLabel > div, .edgeLabel span, .edgeLabel p, .edgeLabel .labelBkg").forEach((el) => {
+        el.style.setProperty("background-color", "#f1f5f9", "important");
+        el.style.setProperty("color", "#0f172a", "important");
+        el.style.setProperty("font-weight", "700", "important");
+        el.style.setProperty("font-size", "12px", "important");
+        el.style.setProperty("padding", "2px 6px", "important");
+        el.style.setProperty("border-radius", "4px", "important");
+        el.style.setProperty("border", "1px solid #94a3b8", "important");
+        el.style.setProperty("opacity", "1", "important");
+        el.style.setProperty("overflow", "visible", "important");
+      });
+      svgRoot.querySelectorAll(".edgeLabel rect").forEach((el) => {
+        el.setAttribute("fill", "#f1f5f9");
+        el.setAttribute("stroke", "#94a3b8");
+        el.style.setProperty("fill", "#f1f5f9", "important");
+        el.style.setProperty("opacity", "1", "important");
+      });
+      // Node labels stay white on colored nodes
+      svgRoot.querySelectorAll(".nodeLabel, .nodeLabel span, .nodeLabel p, .label, foreignObject span, foreignObject p").forEach((el) => {
+        if (el.closest(".edgeLabel")) return;
+        el.style.setProperty("color", "#ffffff", "important");
+        el.style.setProperty("font-weight", "600", "important");
+      });
+      svgRoot.querySelectorAll("text").forEach((el) => {
+        if (el.closest(".edgeLabel")) {
+          el.setAttribute("fill", "#0f172a");
+          el.style.setProperty("fill", "#0f172a", "important");
+          return;
+        }
+        el.setAttribute("fill", "#ffffff");
+        el.style.setProperty("fill", "#ffffff", "important");
+      });
+      svgRoot.querySelectorAll("path.flowchart-link, .messageLine0, .messageLine1").forEach((el) => {
+        el.setAttribute("stroke", "#e2e8f0");
+        el.setAttribute("stroke-width", "2");
+        el.style.setProperty("stroke", "#e2e8f0", "important");
+      });
+      svgRoot.querySelectorAll("marker path").forEach((el) => {
+        el.setAttribute("fill", "#e2e8f0");
+        el.setAttribute("stroke", "#e2e8f0");
+      });
+    }
+
+    async function renderMermaid(root) {
+      const nodes = root.querySelectorAll("pre.mermaid");
+      for (const node of nodes) {
+        if (node.dataset.processed) continue;
+        const def = node.textContent;
+        node.dataset.processed = "true";
+        try {
+          const id = `mmd-${Math.random().toString(36).slice(2)}`;
+          const { svg } = await mermaid.render(id, def);
+          const wrap = document.createElement("div");
+          wrap.className = "mermaid";
+          wrap.innerHTML = svg;
+          contrastFixMermaid(wrap);
+          node.replaceWith(wrap);
+        } catch (err) {
+          console.error("Mermaid render failed", err);
+          node.textContent = "Diagram failed to render — check console.";
+        }
+      }
+    }
+
+    deck.on("ready", () => {
+      renderMermaid(document);
+    });
+
+    deck.on("slidechanged", (event) => {
+      renderMermaid(event.currentSlide);
+    });
+
+    deck.initialize();
+  </script>
+</body>
+</html>
