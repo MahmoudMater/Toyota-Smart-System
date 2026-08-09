@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Toyota Kiosk Voice — Test</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg0: #0f1a14;
+        --bg1: #1a2e24;
+        --ink: #e8f0ea;
+        --muted: #9bb0a3;
+        --accent: #c4a35a;
+        --ok: #3d9a6a;
+        --danger: #c45c4a;
+        --panel: rgba(232, 240, 234, 0.06);
+        --line: rgba(232, 240, 234, 0.14);
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "DM Sans", system-ui, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(1200px 600px at 10% -10%, #2a4a38 0%, transparent 55%),
+          radial-gradient(900px 500px at 100% 0%, #3a3220 0%, transparent 50%),
+          linear-gradient(165deg, var(--bg0), var(--bg1));
+      }
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 1.5rem;
+        display: grid;
+        gap: 1.25rem;
+      }
+      h1 {
+        font-family: "Instrument Serif", Georgia, serif;
+        font-weight: 400;
+        font-size: clamp(1.8rem, 4vw, 2.6rem);
+        margin: 0 0 0.25rem;
+      }
+      .sub { color: var(--muted); margin: 0 0 0.5rem; }
+      .row {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        gap: 1.25rem;
+      }
+      @media (max-width: 720px) {
+        .row { grid-template-columns: 1fr; }
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 1rem;
+      }
+      .avatar-wrap {
+        aspect-ratio: 1;
+        display: grid;
+        place-items: center;
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      #avatarCanvas, #riveCanvas {
+        width: 100%;
+        height: 100%;
+        max-width: 280px;
+        max-height: 280px;
+      }
+      label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.35rem; }
+      textarea, input[type="text"] {
+        width: 100%;
+        border: 1px solid var(--line);
+        background: rgba(0, 0, 0, 0.25);
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 0.65rem 0.75rem;
+        font: inherit;
+      }
+      textarea { min-height: 88px; resize: vertical; }
+      .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+      button {
+        font: inherit;
+        font-weight: 600;
+        border: 0;
+        border-radius: 8px;
+        padding: 0.6rem 1rem;
+        cursor: pointer;
+        background: var(--accent);
+        color: #1a1408;
+      }
+      button.secondary { background: rgba(232, 240, 234, 0.12); color: var(--ink); }
+      button.ok { background: var(--ok); color: #04140c; }
+      button.danger { background: var(--danger); color: #fff; }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      body.rtl { direction: rtl; }
+      body.rtl .row { direction: rtl; }
+      #langButtons.hidden { display: none !important; }
+
+      .status {
+        font-family: ui-monospace, monospace;
+        font-size: 0.8rem;
+        color: var(--muted);
+        white-space: pre-wrap;
+        margin-top: 0.75rem;
+      }
+      .profile {
+        display: grid;
+        gap: 0.25rem;
+        margin: 0.75rem 0;
+        padding: 0.75rem;
+        border-left: 3px solid var(--accent);
+        background: rgba(196, 163, 90, 0.08);
+      }
+      .keypad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.4rem;
+        margin-top: 0.75rem;
+        max-width: 220px;
+      }
+      .keypad button { padding: 0.75rem; }
+      .hidden { display: none !important; }
+      audio { width: 100%; margin-top: 0.5rem; }
+      h2 { font-size: 1rem; margin: 0 0 0.5rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Toyota Gate Kiosk</h1>
+        <p class="sub">Phase 1 voice pipeline test — TTS / STT / session / avatar</p>
+      </header>
+
+      <div class="row">
+        <section class="panel">
+          <h2>Avatar</h2>
+          <div class="avatar-wrap">
+            <canvas id="riveCanvas" class="hidden" width="280" height="280"></canvas>
+            <canvas id="avatarCanvas" width="280" height="280"></canvas>
+          </div>
+          <p class="status" id="avatarStatus">idle</p>
+        </section>
+
+        <section class="panel">
+          <h2>Session</h2>
+          <label for="gateId">Gate ID</label>
+          <input id="gateId" type="text" value="gate-1" />
+          <div class="actions">
+            <button id="startBtn" type="button">Start visit</button>
+            <button id="yesBtn" class="ok" type="button" disabled>Yes</button>
+            <button id="noBtn" class="danger" type="button" disabled>No</button>
+          </div>
+          <!-- Language picker hidden until Arabic is re-enabled -->
+          <div class="actions hidden" id="langButtons">
+            <button id="arBtn" class="secondary" type="button" disabled>عربي</button>
+            <button id="enBtn" class="secondary" type="button" disabled>English</button>
+          </div>
+          <div class="profile hidden" id="profileBox">
+            <div><strong id="profileName">—</strong></div>
+            <div>Plate: <span id="profilePlate">—</span></div>
+            <div>Phone on file: <span id="profilePhone">—</span></div>
+          </div>
+          <p id="promptText" class="sub">Press Start visit to begin.</p>
+          <p class="status" id="sessionStatus"></p>
+
+          <div id="keypadSection" class="hidden">
+            <h2>Phone keypad</h2>
+            <input id="phoneInput" type="text" inputmode="numeric" placeholder="Phone digits" />
+            <div class="keypad" id="keypad"></div>
+            <div class="actions">
+              <button id="submitPhoneBtn" class="ok" type="button">Submit number</button>
+              <button id="clearPhoneBtn" class="secondary" type="button">Clear</button>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="recordBtn" class="secondary" type="button" disabled>
+              Hold to record answer
+            </button>
+          </div>
+          <p class="status" id="recordStatus">
+            Mic answer: press and hold the button, speak, then release.
+          </p>
+        </section>
+      </div>
+
+      <section class="panel">
+        <h2>Stage 1 — TTS sandbox</h2>
+        <label for="ttsText">Text to speak</label>
+        <textarea id="ttsText">Welcome to Toyota. Please confirm your identity.</textarea>
+        <div class="actions">
+          <button id="speakBtn" type="button">Speak</button>
+        </div>
+        <audio id="ttsAudio" controls></audio>
+        <p class="status" id="ttsStatus"></p>
+      </section>
+
+      <section class="panel">
+        <h2>Stage 2 — STT sandbox</h2>
+        <div class="actions">
+          <button id="sttRecordBtn" class="secondary" type="button">Record clip</button>
+          <button id="sttStopBtn" type="button" disabled>Stop &amp; upload</button>
+        </div>
+        <p class="status" id="sttStatus">Idle</p>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/@rive-app/canvas@2.25.3/rive.js"></script>
+    <script src="./avatar.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.wav
+/tmp/
+.DS_Store
+
+# Large local models (download via README instructions)
+voices/*.onnx
+voices/**/*.onnx
