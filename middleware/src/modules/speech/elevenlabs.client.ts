@@ -13,6 +13,21 @@ export interface ElevenLabsRequestOptions {
   contentType?: string;
 }
 
+const MAX_ATTEMPTS = 4;
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryableBody(status: number, body: string): boolean {
+  if (status === 429) return true;
+  if (!RETRYABLE_STATUSES.has(status)) return false;
+  // Don't retry hard auth / payment errors that sometimes arrive as 503 wrappers.
+  if (/payment_required|unauthorized|invalid_api_key/i.test(body)) return false;
+  return true;
+}
+
 @Injectable()
 export class ElevenLabsClient {
   private readonly baseUrl = 'https://api.elevenlabs.io';
@@ -47,36 +62,64 @@ export class ElevenLabsClient {
       headers['Content-Type'] = options.contentType;
     }
 
-    const started = Date.now();
-    this.logger.info({ url, method }, 'elevenlabs.request');
+    let lastErrorText = '';
+    let lastStatus = 0;
 
-    const res = await globalThis.fetch(url, {
-      method,
-      headers,
-      body: options.body,
-    });
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      const started = Date.now();
+      this.logger.info({ url, method, attempt }, 'elevenlabs.request');
 
-    if (!res.ok) {
+      const res = await globalThis.fetch(url, {
+        method,
+        headers,
+        body: options.body,
+      });
+
+      if (res.ok) {
+        this.logger.info(
+          {
+            url,
+            method,
+            status: res.status,
+            attempt,
+            durationMs: Date.now() - started,
+          },
+          'elevenlabs.response',
+        );
+        return res;
+      }
+
       const text = await res.text().catch(() => '');
+      lastStatus = res.status;
+      lastErrorText = text;
+      const retryable =
+        attempt < MAX_ATTEMPTS && isRetryableBody(res.status, text);
+
       this.logger.error(
         {
           status: res.status,
           url,
+          attempt,
+          retryable,
           durationMs: Date.now() - started,
           body: text.slice(0, 500),
         },
         'elevenlabs.error',
       );
-      throw new ServiceUnavailableException(
-        `ElevenLabs API ${res.status}: ${text.slice(0, 200)}`,
+
+      if (!retryable) break;
+
+      // 429 system_busy: back off ~0.8s, 1.6s, 3.2s (+ jitter)
+      const delayMs = Math.round(800 * 2 ** (attempt - 1) + Math.random() * 200);
+      this.logger.warn(
+        { attempt, delayMs, status: res.status },
+        'elevenlabs.retry',
       );
+      await sleep(delayMs);
     }
 
-    this.logger.info(
-      { url, method, status: res.status, durationMs: Date.now() - started },
-      'elevenlabs.response',
+    throw new ServiceUnavailableException(
+      `ElevenLabs API ${lastStatus}: ${lastErrorText.slice(0, 200)}`,
     );
-
-    return res;
   }
 }

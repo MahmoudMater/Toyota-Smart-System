@@ -1,5 +1,17 @@
 # Releases
 
+## [2026-08-11 15:46] Retry ElevenLabs 429 system_busy
+
+**By:** @MahmoudMater
+
+**Requested:** Why TTS 503 / ElevenLabs 429 system_busy after upgrading plan.
+
+**Changes:**
+- Explained: `system_busy` is ElevenLabs capacity (esp. `eleven_v3`), not a broken middleware URL
+- Added up to 4 attempts with exponential backoff on 429/5xx in `middleware/src/modules/speech/elevenlabs.client.ts`
+
+**Notes:** Live probe after the error returned HTTP 200 + MP3 (~37KB). Redis TTS cache will avoid repeat calls for identical prompts.
+
 ## [2026-08-11 14:07] Fix silent visit TTS + ElevenLabs call tracing
 
 **By:** @MahmoudMater
