@@ -1,0 +1,519 @@
+{
+  "ranAt": "2026-08-11T10:22:53.023Z",
+  "baseUrl": "http://127.0.0.1:11434/v1",
+  "cpuNote": "Set OLLAMA_NUM_PARALLEL=1 OLLAMA_NUM_THREAD=4 on the *ollama serve* process (not the node client) for VPS-like CPU sizing. Uses native /api/chat with think:false.",
+  "results": [
+    {
+      "model": "qwen3:0.6b",
+      "total": 37,
+      "correct": 10,
+      "accuracy": 0.2702702702702703,
+      "p50Ms": 2681,
+      "p95Ms": 3411,
+      "meanMs": 2492,
+      "completionTokensPerSec": 7,
+      "totalPromptTokens": 19044,
+      "totalCompletionTokens": 642,
+      "failures": [
+        {
+          "id": "clean-eg-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "01011234567"
+          }
+        },
+        {
+          "id": "clean-eg-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01555123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "015551234567"
+          }
+        },
+        {
+          "id": "clean-sa-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0555123456"
+          },
+          "got": {
+            "intent": "yes",
+            "digits": null
+          }
+        },
+        {
+          "id": "filler-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "010112345678"
+          }
+        },
+        {
+          "id": "filler-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0555123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "05551234567"
+          }
+        },
+        {
+          "id": "filler-03",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01123456789"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "0112345678"
+          }
+        },
+        {
+          "id": "correction-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0555134567"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "05551234567"
+          }
+        },
+        {
+          "id": "correction-03",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01056789012"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "0104156789012"
+          }
+        },
+        {
+          "id": "correction-04",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0554123456"
+          },
+          "got": {
+            "intent": "yes",
+            "digits": null
+          }
+        },
+        {
+          "id": "oh-as-zero-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "010112345678"
+          }
+        },
+        {
+          "id": "oh-as-zero-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0505123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "0551234567"
+          }
+        },
+        {
+          "id": "oh-interjection-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "010112345678"
+          }
+        },
+        {
+          "id": "group-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0555222198"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "055521987"
+          }
+        },
+        {
+          "id": "group-03",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01255999898"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "012598"
+          }
+        },
+        {
+          "id": "cc-eg-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "21012345678"
+          }
+        },
+        {
+          "id": "cc-eg-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "00210112345678"
+          }
+        },
+        {
+          "id": "cc-sa-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0501234567"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "966501234567"
+          }
+        },
+        {
+          "id": "cc-sa-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0555123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "00966555123456"
+          }
+        },
+        {
+          "id": "ar-clean-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "01011234567"
+          }
+        },
+        {
+          "id": "ar-clean-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0555123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "055511234567"
+          }
+        },
+        {
+          "id": "ar-filler-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "01011234567"
+          }
+        },
+        {
+          "id": "ar-correction-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0553123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "05511234567"
+          }
+        },
+        {
+          "id": "ar-indic-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "0101234567"
+          }
+        },
+        {
+          "id": "null-01",
+          "expected": {
+            "normalized": null,
+            "digits": null
+          },
+          "got": {
+            "intent": "no",
+            "digits": null
+          }
+        },
+        {
+          "id": "null-02",
+          "expected": {
+            "normalized": null,
+            "digits": null
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "01011234567"
+          }
+        },
+        {
+          "id": "edge-short",
+          "expected": {
+            "normalized": "digits",
+            "digits": "123"
+          },
+          "got": {
+            "intent": "yes",
+            "digits": null
+          }
+        },
+        {
+          "id": "edge-mixed-lang",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "01011234567"
+          }
+        }
+      ]
+    },
+    {
+      "model": "qwen3:1.7b",
+      "total": 37,
+      "correct": 20,
+      "accuracy": 0.5405405405405406,
+      "p50Ms": 6116,
+      "p95Ms": 7953,
+      "meanMs": 5772,
+      "completionTokensPerSec": 3.1,
+      "totalPromptTokens": 19044,
+      "totalCompletionTokens": 658,
+      "failures": [
+        {
+          "id": "filler-03",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01123456789"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "0112345678"
+          }
+        },
+        {
+          "id": "correction-03",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01056789012"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "01040123456789012"
+          }
+        },
+        {
+          "id": "correction-04",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0554123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "05354123456"
+          }
+        },
+        {
+          "id": "oh-as-zero-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "112345678"
+          }
+        },
+        {
+          "id": "oh-as-zero-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0505123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "050123456"
+          }
+        },
+        {
+          "id": "group-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0555222198"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "055521987"
+          }
+        },
+        {
+          "id": "group-03",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01255999898"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "0121598"
+          }
+        },
+        {
+          "id": "cc-eg-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "21012345678"
+          }
+        },
+        {
+          "id": "cc-eg-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "002010112345678"
+          }
+        },
+        {
+          "id": "cc-sa-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0501234567"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "966501234567"
+          }
+        },
+        {
+          "id": "cc-sa-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0555123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "00966555123456"
+          }
+        },
+        {
+          "id": "ar-clean-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "01011234567"
+          }
+        },
+        {
+          "id": "ar-clean-02",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0555123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "055123456"
+          }
+        },
+        {
+          "id": "ar-filler-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "01012345678"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "01011234567"
+          }
+        },
+        {
+          "id": "ar-correction-01",
+          "expected": {
+            "normalized": "digits",
+            "digits": "0553123456"
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "0550512345"
+          }
+        },
+        {
+          "id": "null-01",
+          "expected": {
+            "normalized": null,
+            "digits": null
+          },
+          "got": {
+            "intent": "unknown",
+            "digits": null
+          }
+        },
+        {
+          "id": "null-02",
+          "expected": {
+            "normalized": null,
+            "digits": null
+          },
+          "got": {
+            "intent": "digits",
+            "digits": "01011234567"
+          }
+        }
+      ]
+    }
+  ]
+}

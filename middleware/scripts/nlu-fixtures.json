@@ -1,0 +1,443 @@
+[
+  {
+    "id": "clean-eg-01",
+    "input": "zero one zero one two three four five six seven eight",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "clean",
+      "eg"
+    ]
+  },
+  {
+    "id": "clean-eg-02",
+    "input": "0 1 5 5 5 1 2 3 4 5 6",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01555123456"
+    },
+    "tags": [
+      "clean",
+      "eg"
+    ]
+  },
+  {
+    "id": "clean-sa-01",
+    "input": "zero five zero one two three four five six seven",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0501234567"
+    },
+    "tags": [
+      "clean",
+      "sa"
+    ]
+  },
+  {
+    "id": "clean-sa-02",
+    "input": "0555123456",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0555123456"
+    },
+    "tags": [
+      "clean",
+      "sa"
+    ]
+  },
+  {
+    "id": "filler-01",
+    "input": "ummm my phone number is zero one zero one two three four five six seven eight",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "filler",
+      "eg"
+    ]
+  },
+  {
+    "id": "filler-02",
+    "input": "so like its zero five five five one two three four five six",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0555123456"
+    },
+    "tags": [
+      "filler",
+      "sa"
+    ]
+  },
+  {
+    "id": "filler-03",
+    "input": "uh let me think zero one one two three uh four five six seven eight nine",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01123456789"
+    },
+    "tags": [
+      "filler",
+      "eg"
+    ]
+  },
+  {
+    "id": "correction-01",
+    "input": "ummm my phone number is zero one five five five zero three oh no no two nine nine",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01555032099"
+    },
+    "tags": [
+      "correction",
+      "eg",
+      "key-case"
+    ]
+  },
+  {
+    "id": "correction-02",
+    "input": "zero five five five one two no sorry one three four five six seven",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0555134567"
+    },
+    "tags": [
+      "correction",
+      "sa"
+    ]
+  },
+  {
+    "id": "correction-03",
+    "input": "zero one zero four wait no zero one zero five six seven eight nine zero one two",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01056789012"
+    },
+    "tags": [
+      "correction",
+      "eg"
+    ]
+  },
+  {
+    "id": "correction-04",
+    "input": "its zero five three no I mean five four one two three four five six",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0554123456"
+    },
+    "tags": [
+      "correction",
+      "sa"
+    ]
+  },
+  {
+    "id": "oh-as-zero-01",
+    "input": "oh one oh one two three four five six seven eight",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "oh",
+      "eg"
+    ]
+  },
+  {
+    "id": "oh-as-zero-02",
+    "input": "zero five oh five one two three four five six",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0505123456"
+    },
+    "tags": [
+      "oh",
+      "sa"
+    ]
+  },
+  {
+    "id": "oh-interjection-01",
+    "input": "oh the number is zero one zero one two three four five six seven eight",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "oh",
+      "eg"
+    ]
+  },
+  {
+    "id": "group-01",
+    "input": "zero one zero double one two three four five six seven",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01011234567"
+    },
+    "tags": [
+      "group",
+      "eg"
+    ]
+  },
+  {
+    "id": "group-02",
+    "input": "zero five five five triple two one nine eight",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0555222198"
+    },
+    "tags": [
+      "group",
+      "sa"
+    ]
+  },
+  {
+    "id": "group-03",
+    "input": "zero one two double five triple nine eight nine eight",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01255999898"
+    },
+    "tags": [
+      "group",
+      "eg"
+    ]
+  },
+  {
+    "id": "cc-eg-01",
+    "input": "plus twenty one zero one two three four five six seven eight",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "country-code",
+      "eg"
+    ]
+  },
+  {
+    "id": "cc-eg-02",
+    "input": "002 zero one zero one two three four five six seven eight",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "country-code",
+      "eg"
+    ]
+  },
+  {
+    "id": "cc-sa-01",
+    "input": "plus nine six six five zero one two three four five six seven",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0501234567"
+    },
+    "tags": [
+      "country-code",
+      "sa"
+    ]
+  },
+  {
+    "id": "cc-sa-02",
+    "input": "00966 555 123 456",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0555123456"
+    },
+    "tags": [
+      "country-code",
+      "sa"
+    ]
+  },
+  {
+    "id": "ar-clean-01",
+    "input": "صفر واحد صفر واحد اتنين ثلاثة اربعة خمسة ستة سبعة ثمانية",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "arabic",
+      "eg"
+    ]
+  },
+  {
+    "id": "ar-clean-02",
+    "input": "صفر خمسة خمسة خمسة واحد اتنين تلاتة اربعة خمسة ستة",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0555123456"
+    },
+    "tags": [
+      "arabic",
+      "sa"
+    ]
+  },
+  {
+    "id": "ar-filler-01",
+    "input": "يعني الرقم صفر واحد صفر واحد اتنين تلاته اربعه خمسه سته سبعه تمانية",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "arabic",
+      "filler",
+      "eg"
+    ]
+  },
+  {
+    "id": "ar-correction-01",
+    "input": "صفر خمسة خمسة لا لا خمسة تلاتة واحد اتنين تلاتة اربعة خمسة ستة",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0553123456"
+    },
+    "tags": [
+      "arabic",
+      "correction",
+      "sa"
+    ]
+  },
+  {
+    "id": "ar-indic-01",
+    "input": "٠١٠١٢٣٤٥٦٧٨",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "arabic-indic",
+      "eg"
+    ]
+  },
+  {
+    "id": "yes-simple",
+    "input": "yes",
+    "expected": {
+      "normalized": "yes",
+      "digits": null
+    },
+    "tags": [
+      "yes-no"
+    ]
+  },
+  {
+    "id": "yes-casual",
+    "input": "yeah I guess so",
+    "expected": {
+      "normalized": "yes",
+      "digits": null
+    },
+    "tags": [
+      "yes-no"
+    ]
+  },
+  {
+    "id": "yes-ar",
+    "input": "ايوه تمام",
+    "expected": {
+      "normalized": "yes",
+      "digits": null
+    },
+    "tags": [
+      "yes-no",
+      "arabic"
+    ]
+  },
+  {
+    "id": "no-simple",
+    "input": "no",
+    "expected": {
+      "normalized": "no",
+      "digits": null
+    },
+    "tags": [
+      "yes-no"
+    ]
+  },
+  {
+    "id": "no-casual",
+    "input": "nah thats wrong",
+    "expected": {
+      "normalized": "no",
+      "digits": null
+    },
+    "tags": [
+      "yes-no"
+    ]
+  },
+  {
+    "id": "no-ar",
+    "input": "لا مش صح",
+    "expected": {
+      "normalized": "no",
+      "digits": null
+    },
+    "tags": [
+      "yes-no",
+      "arabic"
+    ]
+  },
+  {
+    "id": "null-01",
+    "input": "I have no idea what you said",
+    "expected": {
+      "normalized": null,
+      "digits": null
+    },
+    "tags": [
+      "null"
+    ]
+  },
+  {
+    "id": "null-02",
+    "input": "",
+    "expected": {
+      "normalized": null,
+      "digits": null
+    },
+    "tags": [
+      "null"
+    ]
+  },
+  {
+    "id": "edge-short",
+    "input": "one two three",
+    "expected": {
+      "normalized": "digits",
+      "digits": "123"
+    },
+    "tags": [
+      "edge"
+    ]
+  },
+  {
+    "id": "edge-mixed-lang",
+    "input": "zero one صفر واحد two three four five six seven eight",
+    "expected": {
+      "normalized": "digits",
+      "digits": "01012345678"
+    },
+    "tags": [
+      "edge",
+      "mixed-lang",
+      "eg"
+    ]
+  },
+  {
+    "id": "edge-with-noise",
+    "input": "my number is umm well its zero five zero one two three four five six seven",
+    "expected": {
+      "normalized": "digits",
+      "digits": "0501234567"
+    },
+    "tags": [
+      "filler",
+      "sa"
+    ]
+  }
+]

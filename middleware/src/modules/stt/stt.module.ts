@@ -2,6 +2,7 @@ import { Module, Provider } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Env } from '../../config/env.validation';
 import { SpeechModule } from '../speech/speech.module';
+import { NluModule } from '../nlu/nlu.module';
 import { ElevenLabsSttAdapter } from './elevenlabs-stt.adapter';
 import { SPEECH_TRANSCRIBER } from './speech.transcriber';
 import { SttController } from './stt.controller';
@@ -19,7 +20,7 @@ const speechTranscriberProvider: Provider = {
 };
 
 @Module({
-  imports: [SpeechModule],
+  imports: [SpeechModule, NluModule],
   controllers: [SttController],
   providers: [
     ElevenLabsSttAdapter,

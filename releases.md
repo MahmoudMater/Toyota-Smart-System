@@ -1,5 +1,58 @@
 # Releases
 
+## [2026-08-11 13:27] NLU latency-first for realtime sockets
+
+**By:** @MahmoudMater
+
+**Requested:** Don't need 100% extraction accuracy (confirm step exists); must be fast for Socket.io realtime.
+
+**Changes:**
+- Hybrid fast path in `nlu.service.ts`: rules for yes/no + clean phones; LLM only for messy digit speech; 2s fail-fast timeout
+- Default model `qwen3:0.6b`, `NLU_TIMEOUT_MS=2000`; slimmed prompt for lower prefill
+- Updated `docs/nlu-sizing.md` for latency-first product constraints
+
+**Notes:** Confirm read-back remains the accuracy safety net. GPU still preferred if messy-phone LLM turns must stay under ~500ms.
+
+## [2026-08-11 13:25] NLU bake-off results + VPS sizing doc
+
+**By:** @MahmoudMater
+
+**Requested:** Finish benchmark analysis and cost/sizing plan after Ollama runs.
+
+**Changes:**
+- Chose `qwen3:1.7b` (54% vs rules 43%; `0.6b` at 27% rejected); wrote `middleware/docs/nlu-sizing.md`
+- Strengthened fallback in `nlu.service.ts` when LLM digits fail EG/SA validation; added CC few-shots to `prompt.ts`
+- Fixed a few ambiguous fixtures; refreshed `scripts/nlu-fixtures.json`
+
+**Notes:** Key self-correction case passed on both models. CPU 4-thread p50 ~6s for 1.7B — GPU recommended for interactive kiosk.
+
+## [2026-08-11 13:15] Fix Qwen3 empty NLU responses (disable thinking)
+
+**By:** @MahmoudMater
+
+**Requested:** Benchmark failed with Unparseable/empty content and timeouts on qwen3:0.6b / 1.7b.
+
+**Changes:**
+- Benchmark now uses Ollama native `/api/chat` with `think: false` + `format: json` (OpenAI `/v1` ignores think and burns tokens on thinking)
+- `llm-nlu.adapter.ts` prefers native Ollama path when `NLU_BASE_URL` ends in `/v1`; OpenAI-compat sends `think` / `reasoning_effort` / `/no_think`
+- Default `NLU_TIMEOUT_MS` raised to 5000; benchmark default timeout 120s
+
+**Notes:** Re-run benchmark after Ctrl+C of the hung run. Set thread caps on `ollama serve`, not the node client.
+
+## [2026-08-11 12:47] Local LLM NLU module for STT transcript extraction
+
+**By:** @MahmoudMater
+
+**Requested:** Dig into Hugging Face / local LLM to extract phone digits and yes/no from messy STT transcripts (self-corrections, filler, Arabic).
+
+**Changes:**
+- Added `middleware/src/modules/nlu/` — port/adapter seam (`rules` default, `llm` via OpenAI-compatible HTTP), EG/SA phone validation, prompt + few-shots, eval corpus (37 fixtures)
+- Wired `NluService` into `SttService`; env: `NLU_*`, `PHONE_REGIONS` in `env.validation.ts` and `.env.example`
+- Rules baseline on corpus: **43.2%** (documents why LLM is needed)
+- Added `middleware/scripts/nlu-benchmark.mjs` + `nlu-fixtures.json` for 0.6B vs 1.7B bake-off
+
+**Notes:** Benchmark/sizing doc still pending user-run of Ollama pulls + script. Default remains `NLU_ADAPTER=rules` until switched on.
+
 ## [2026-08-11 12:45] Move TTS/STT to ElevenLabs in middleware; delete Python voice service
 
 **By:** @MahmoudMater

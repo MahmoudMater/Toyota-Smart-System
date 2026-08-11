@@ -1,5 +1,7 @@
 import { SttService } from './stt.service';
 import type { SpeechTranscriber, TranscribeResult } from './speech.transcriber';
+import type { NluService } from '../nlu/nlu.service';
+import { normalizeTranscript } from '../../common/normalize';
 
 class FakeTranscriber implements SpeechTranscriber {
   readonly adapterName = 'fake';
@@ -11,13 +13,20 @@ class FakeTranscriber implements SpeechTranscriber {
 }
 
 function fakeLogger() {
-  return { setContext: jest.fn(), debug: jest.fn(), info: jest.fn() } as any;
+  return { setContext: jest.fn(), debug: jest.fn(), info: jest.fn(), warn: jest.fn() } as any;
+}
+
+function fakeNluService(): NluService {
+  return {
+    adapterName: 'rules',
+    interpret: async (text: string) => normalizeTranscript(text),
+  } as any;
 }
 
 function createService(response = 'yes') {
   const transcriber = new FakeTranscriber();
   transcriber.response = response;
-  const service = new SttService(transcriber, fakeLogger());
+  const service = new SttService(transcriber, fakeNluService(), fakeLogger());
   return { service, transcriber };
 }
 

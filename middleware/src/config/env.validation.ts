@@ -27,6 +27,16 @@ export const envSchema = z.object({
   CORS_ORIGINS: z
     .string()
     .default('http://localhost:3000,http://127.0.0.1:3000'),
+
+  // NLU (transcript interpretation)
+  NLU_ADAPTER: z.enum(['rules', 'llm']).default('rules'),
+  NLU_BASE_URL: z.string().default('http://127.0.0.1:11434/v1'),
+  // 0.6b: latency-first for realtime sockets; confirm step covers misses.
+  NLU_MODEL: z.string().default('qwen3:0.6b'),
+  NLU_API_KEY: z.string().optional().default(''),
+  // Fail fast to rules so the socket path never hangs.
+  NLU_TIMEOUT_MS: z.coerce.number().default(2000),
+  PHONE_REGIONS: z.string().default('EG,SA'),
 });
 
 export type Env = z.infer<typeof envSchema>;
