@@ -52,6 +52,18 @@ export class ElevenLabsTtsAdapter implements SpeechSynthesizer {
       body.language_code = lang;
     }
 
+    this.logger.info(
+      {
+        voiceId: this.voiceId,
+        modelId: this.modelId,
+        format: this.outputFormat,
+        lang,
+        chars: text.length,
+        preview: text.slice(0, 80),
+      },
+      'tts.elevenlabs.call',
+    );
+
     const res = await this.client.fetch({
       path: `/v1/text-to-speech/${this.voiceId}?output_format=${this.outputFormat}`,
       method: 'POST',
@@ -64,8 +76,8 @@ export class ElevenLabsTtsAdapter implements SpeechSynthesizer {
     const contentType =
       FORMAT_TO_CONTENT_TYPE[this.outputFormat] ?? 'audio/mpeg';
 
-    this.logger.debug(
-      { bytes: audio.length, lang, format: this.outputFormat },
+    this.logger.info(
+      { bytes: audio.length, lang, format: this.outputFormat, contentType },
       'tts.elevenlabs.synthesized',
     );
 

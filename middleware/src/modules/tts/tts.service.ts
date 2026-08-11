@@ -53,7 +53,15 @@ export class TtsService {
 
     const cached = await this.redis.getBuffer(key);
     if (cached) {
-      this.logger.debug({ key, bytes: cached.length }, 'tts.cache.hit');
+      this.logger.info(
+        {
+          adapter: this.synthesizer.adapterName,
+          lang,
+          chars: trimmed.length,
+          bytes: cached.length,
+        },
+        'tts.cache.hit',
+      );
       const format = this.config.get('ELEVENLABS_TTS_OUTPUT_FORMAT', {
         infer: true,
       });
@@ -63,11 +71,24 @@ export class TtsService {
       return { audio: cached, contentType };
     }
 
+    this.logger.info(
+      {
+        adapter: this.synthesizer.adapterName,
+        lang,
+        chars: trimmed.length,
+        preview: trimmed.slice(0, 80),
+      },
+      'tts.synthesize.start',
+    );
     const result = await this.synthesizer.synthesize(trimmed, lang);
     await this.redis.set(key, result.audio, 'EX', this.cacheTtl());
-    this.logger.debug(
-      { key, bytes: result.audio.length },
-      'tts.cache.miss.stored',
+    this.logger.info(
+      {
+        adapter: this.synthesizer.adapterName,
+        bytes: result.audio.length,
+        contentType: result.contentType,
+      },
+      'tts.synthesize.done',
     );
     return result;
   }

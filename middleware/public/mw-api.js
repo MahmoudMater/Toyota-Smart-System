@@ -45,7 +45,9 @@
         const errText = await res.text();
         throw new Error(`TTS ${res.status}: ${errText.slice(0, 200)}`);
       }
-      return res.arrayBuffer();
+      const contentType = res.headers.get("content-type") || "audio/mpeg";
+      const buffer = await res.arrayBuffer();
+      return { buffer, contentType };
     }
 
     async function stt(formData) {

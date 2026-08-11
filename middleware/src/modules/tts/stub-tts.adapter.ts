@@ -36,7 +36,8 @@ const SILENT_WAV = silentWav();
 export class StubTtsAdapter implements SpeechSynthesizer {
   readonly adapterName = 'stub';
 
-  async synthesize(_text: string, _lang: string): Promise<SynthesizeResult> {
+  async synthesize(text: string, _lang: string): Promise<SynthesizeResult> {
+    // Intentionally silent — switch TTS_ADAPTER=elevenlabs for real audio.
     return { audio: SILENT_WAV, contentType: 'audio/wav' };
   }
 }

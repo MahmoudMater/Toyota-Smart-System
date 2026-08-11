@@ -20,7 +20,8 @@ export const envSchema = z.object({
   STT_ADAPTER: z.enum(['elevenlabs', 'stub']).default('elevenlabs'),
   ELEVENLABS_API_KEY: z.string().optional().default(''),
   ELEVENLABS_TTS_VOICE_ID: z.string().optional().default(''),
-  ELEVENLABS_TTS_MODEL_ID: z.string().default('eleven_multilingual_v2'),
+  // Audio tags / ellipsis pacing require eleven_v3 (not multilingual_v2).
+  ELEVENLABS_TTS_MODEL_ID: z.string().default('eleven_v3'),
   ELEVENLABS_TTS_OUTPUT_FORMAT: z.string().default('mp3_44100_128'),
   ELEVENLABS_STT_MODEL_ID: z.string().default('scribe_v2'),
   TTS_CACHE_TTL_SECONDS: z.coerce.number().default(86_400),

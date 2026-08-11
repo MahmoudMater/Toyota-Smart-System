@@ -186,24 +186,24 @@
   }
 
   async function applyPromptSpeech(data) {
-    if (data.prompt) {
-      try {
-        await speakText(data.prompt, promptTtsLang(data));
-      } catch (_) {
-        /* UI still usable via touch */
-      }
-      const listeningStates = [
-        "awaiting_language",
-        "awaiting_identity_confirm",
-        "awaiting_owner_check",
-        "awaiting_phone_speech",
-        "awaiting_phone_confirm",
-      ];
-      if (listeningStates.includes(data.state)) {
-        avatar.setState("listening");
-      } else {
-        avatar.setState(data.avatar_state || "idle");
-      }
+    if (!data?.prompt) return;
+    try {
+      await speakText(data.speech || data.prompt, promptTtsLang(data));
+    } catch (err) {
+      console.warn("Prompt TTS failed", err);
+      ttsStatus.textContent = `TTS error: ${err.message || err}`;
+    }
+    const listeningStates = [
+      "awaiting_language",
+      "awaiting_identity_confirm",
+      "awaiting_owner_check",
+      "awaiting_phone_speech",
+      "awaiting_phone_confirm",
+    ];
+    if (listeningStates.includes(data.state)) {
+      avatar.setState("listening");
+    } else {
+      avatar.setState(data.avatar_state || "idle");
     }
   }
 

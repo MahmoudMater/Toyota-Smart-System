@@ -1,5 +1,31 @@
 # Releases
 
+## [2026-08-11 14:07] Fix silent visit TTS + ElevenLabs call tracing
+
+**By:** @MahmoudMater
+
+**Requested:** Why no voice during visit session; keep track of ElevenLabs calls.
+
+**Changes:**
+- Root cause: `TTS_ADAPTER=stub` in `middleware/.env` returned silent WAV; switched to `elevenlabs` (and STT)
+- Info-level call tracing: `tts.synthesize.start` → `tts.elevenlabs.call` → `elevenlabs.request/response|error` in `tts.service.ts`, `elevenlabs-tts.adapter.ts`, `elevenlabs.client.ts`
+- `mw-api.js` / `console.js` now use TTS response `content-type`; UI surfaces TTS errors instead of failing silently
+
+**Notes:** Live call returns ElevenLabs **402 paid_plan_required** for voice `2bnoa3wtrtcUW41TrSJM` (library voices blocked on free API). Upgrade plan or set `ELEVENLABS_TTS_VOICE_ID` to a voice your key can use.
+
+## [2026-08-11 14:01] TTS prompts rewritten for ElevenLabs v3
+
+**By:** @MahmoudMater
+
+**Requested:** Rewrite TTS messages like the Arabic examples (tashkeel, audio tags, pauses) using ElevenLabs v3 best practices.
+
+**Changes:**
+- Split kiosk copy into `display` + `speech` via `Prompt` in `middleware/src/modules/kiosk/i18n.ts` (Al-Sayer Hayyak brand, EN/AR tags + Arabic tashkeel, 3-3-4 digit read-out)
+- Wired `lastPromptSpeech` / `PublicSession.speech` through `state-machine.ts`; `app.js` / `console.js` speak `speech` and show clean `prompt`
+- Default `ELEVENLABS_TTS_MODEL_ID` → `eleven_v3` in `env.validation.ts` and `.env.example`
+
+**Notes:** Screen never shows tags or tashkeel. Audio tags require v3 — multilingual_v2 would read brackets aloud.
+
 ## [2026-08-11 13:27] NLU latency-first for realtime sockets
 
 **By:** @MahmoudMater

@@ -27,6 +27,7 @@ export interface KioskSession {
   retries: number;
   gateOpenStub: boolean;
   lastPrompt: string;
+  lastPromptSpeech: string;
   plateNumber: string;
 }
 
@@ -47,6 +48,7 @@ export interface PublicSession {
   max_retries: number;
   gate_open_stub: boolean;
   prompt: string;
+  speech: string;
   avatar_state: string;
   ui: {
     rtl: boolean;
@@ -72,6 +74,18 @@ export type SessionOutcome =
       usedOnFilePhone: boolean;
     }
   | { kind: 'escalated'; session: KioskSession; reason: string };
+
+function setPrompt(session: KioskSession, p: i18n.Prompt): void {
+  session.lastPrompt = p.display;
+  session.lastPromptSpeech = p.speech;
+}
+
+function joinPrompts(a: i18n.Prompt, b: i18n.Prompt): i18n.Prompt {
+  return {
+    display: `${a.display} ${b.display}`,
+    speech: `${a.speech} ... ${b.speech}`,
+  };
+}
 
 function maskPhone(phone: string): string {
   const digits = extractDigits(phone) || phone;
@@ -111,6 +125,7 @@ export function toPublic(session: KioskSession): PublicSession {
     max_retries: MAX_RETRIES,
     gate_open_stub: session.gateOpenStub,
     prompt: session.lastPrompt,
+    speech: session.lastPromptSpeech,
     avatar_state: avatarState(session.state),
     ui: {
       rtl: false,
@@ -135,6 +150,7 @@ export function createSession(params: {
     i18n.DEFAULT_LANG,
     params.profile.phone,
   );
+  const combined = joinPrompts(greet, phoneQ);
   return {
     sessionId: params.sessionId,
     gateId: params.gateId,
@@ -145,7 +161,8 @@ export function createSession(params: {
     pendingPhone: null,
     retries: 0,
     gateOpenStub: false,
-    lastPrompt: `${greet} ${phoneQ}`,
+    lastPrompt: combined.display,
+    lastPromptSpeech: combined.speech,
     plateNumber: params.profile.plate,
   };
 }
@@ -155,6 +172,7 @@ export function createNotRecognizedSession(params: {
   gateId: string;
   plateNumber: string;
 }): KioskSession {
+  const prompt = i18n.notRecognized(i18n.DEFAULT_LANG);
   return {
     sessionId: params.sessionId,
     gateId: params.gateId,
@@ -165,7 +183,8 @@ export function createNotRecognizedSession(params: {
     pendingPhone: null,
     retries: 0,
     gateOpenStub: false,
-    lastPrompt: i18n.notRecognized(i18n.DEFAULT_LANG),
+    lastPrompt: prompt.display,
+    lastPromptSpeech: prompt.speech,
     plateNumber: params.plateNumber,
   };
 }
@@ -174,7 +193,7 @@ function complete(session: KioskSession, phone: string): SessionOutcome {
   session.visitPhone = phone;
   session.gateOpenStub = true;
   session.state = KioskState.Done;
-  session.lastPrompt = i18n.done(session.lang);
+  setPrompt(session, i18n.done(session.lang));
   return {
     kind: 'completed',
     session,
@@ -185,7 +204,7 @@ function complete(session: KioskSession, phone: string): SessionOutcome {
 
 function escalate(session: KioskSession, reason: string): SessionOutcome {
   session.state = KioskState.StaffEscalation;
-  session.lastPrompt = i18n.escalate(session.lang);
+  setPrompt(session, i18n.escalate(session.lang));
   return { kind: 'escalated', session, reason };
 }
 
@@ -231,14 +250,14 @@ export function handleInput(
     if (resolvedChoice === 'no') {
       session.state = KioskState.AwaitingOwnerCheck;
       session.retries = 0;
-      session.lastPrompt = i18n.ownerCheck(session.lang);
+      setPrompt(session, i18n.ownerCheck(session.lang));
       return { kind: 'continue', session };
     }
     const escalated = bumpRetry(session, 'unclear_identity_confirm');
     if (escalated) return escalated;
-    session.lastPrompt = i18n.phoneConfirmRetry(
-      session.lang,
-      session.profile.phone,
+    setPrompt(
+      session,
+      i18n.phoneConfirmRetry(session.lang, session.profile.phone),
     );
     return { kind: 'continue', session };
   }
@@ -247,7 +266,7 @@ export function handleInput(
     if (resolvedChoice === 'yes') {
       session.state = KioskState.AwaitingPhoneSpeech;
       session.retries = 0;
-      session.lastPrompt = i18n.askPhone(session.lang);
+      setPrompt(session, i18n.askPhone(session.lang));
       return { kind: 'continue', session };
     }
     if (resolvedChoice === 'no') {
@@ -255,7 +274,7 @@ export function handleInput(
     }
     const escalated = bumpRetry(session, 'unclear_owner_check');
     if (escalated) return escalated;
-    session.lastPrompt = i18n.ownerCheckRetry(session.lang);
+    setPrompt(session, i18n.ownerCheckRetry(session.lang));
     return { kind: 'continue', session };
   }
 
@@ -264,12 +283,12 @@ export function handleInput(
       session.pendingPhone = digits;
       session.state = KioskState.AwaitingPhoneConfirm;
       session.retries = 0;
-      session.lastPrompt = i18n.phoneHeardConfirm(session.lang, digits);
+      setPrompt(session, i18n.phoneHeardConfirm(session.lang, digits));
       return { kind: 'continue', session };
     }
     const escalated = bumpRetry(session, 'unclear_phone');
     if (escalated) return escalated;
-    session.lastPrompt = i18n.phoneUnclear(session.lang);
+    setPrompt(session, i18n.phoneUnclear(session.lang));
     return { kind: 'continue', session };
   }
 
@@ -281,14 +300,14 @@ export function handleInput(
       session.pendingPhone = null;
       session.state = KioskState.AwaitingPhoneSpeech;
       session.retries = 0;
-      session.lastPrompt = i18n.phoneAgain(session.lang);
+      setPrompt(session, i18n.phoneAgain(session.lang));
       return { kind: 'continue', session };
     }
     const escalated = bumpRetry(session, 'unclear_phone_confirm');
     if (escalated) return escalated;
-    session.lastPrompt = i18n.phoneConfirmAgain(
-      session.lang,
-      session.pendingPhone || '',
+    setPrompt(
+      session,
+      i18n.phoneConfirmAgain(session.lang, session.pendingPhone || ''),
     );
     return { kind: 'continue', session };
   }

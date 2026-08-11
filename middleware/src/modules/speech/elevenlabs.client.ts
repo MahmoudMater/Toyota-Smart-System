@@ -47,7 +47,8 @@ export class ElevenLabsClient {
       headers['Content-Type'] = options.contentType;
     }
 
-    this.logger.debug({ url, method }, 'elevenlabs.request');
+    const started = Date.now();
+    this.logger.info({ url, method }, 'elevenlabs.request');
 
     const res = await globalThis.fetch(url, {
       method,
@@ -58,13 +59,23 @@ export class ElevenLabsClient {
     if (!res.ok) {
       const text = await res.text().catch(() => '');
       this.logger.error(
-        { status: res.status, url, body: text.slice(0, 500) },
+        {
+          status: res.status,
+          url,
+          durationMs: Date.now() - started,
+          body: text.slice(0, 500),
+        },
         'elevenlabs.error',
       );
       throw new ServiceUnavailableException(
         `ElevenLabs API ${res.status}: ${text.slice(0, 200)}`,
       );
     }
+
+    this.logger.info(
+      { url, method, status: res.status, durationMs: Date.now() - started },
+      'elevenlabs.response',
+    );
 
     return res;
   }

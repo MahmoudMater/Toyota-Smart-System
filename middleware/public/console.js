@@ -119,8 +119,8 @@
     speaking = true;
     avatar.setState("talking");
     try {
-      const buf = await api.tts(text, lang);
-      await avatar.playWavAndLipSync(buf, ttsAudio, "audio/mpeg");
+      const { buffer, contentType } = await api.tts(text, lang);
+      await avatar.playWavAndLipSync(buffer, ttsAudio, contentType);
     } catch (err) {
       console.warn("TTS failed", err);
       sessionStatus.textContent = `TTS error: ${err.message || err}. Is the middleware running at ${api.getBaseUrl()}?`;
@@ -175,7 +175,7 @@
   async function applyPromptSpeech(data) {
     if (!data?.prompt || data.prompt === lastSpokenPrompt) return;
     lastSpokenPrompt = data.prompt;
-    await speakText(data.prompt, data.lang || "en");
+    await speakText(data.speech || data.prompt, data.lang || "en");
     const listening = [
       "awaiting_identity_confirm",
       "awaiting_owner_check",
