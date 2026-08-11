@@ -1,5 +1,52 @@
 # Releases
 
+## [2026-08-11 12:45] Move TTS/STT to ElevenLabs in middleware; delete Python voice service
+
+**By:** @MahmoudMater
+
+**Requested:** Change TTS to ElevenLabs instead of Piper, move all TTS/STT/voice logic from kiosk-voice/server into middleware as NestJS modules
+
+**Changes:**
+- Created `modules/speech/` (ElevenLabs fetch client), `modules/tts/` (TTS with Redis cache, ElevenLabs + stub adapters), `modules/stt/` (STT with ElevenLabs Scribe + stub adapters) following the env-driven adapter-seam convention
+- Moved `modules/kiosk/normalize.ts` to `src/common/normalize.ts` (shared by kiosk state machine + STT service)
+- Added `TTS_ADAPTER`, `STT_ADAPTER`, `ELEVENLABS_*`, `TTS_CACHE_TTL_SECONDS` to `config/env.validation.ts` and `.env.example`
+- Moved `kiosk-voice/kiosk-ui/` to `middleware/public/` and added `@nestjs/serve-static` — single process on :3000
+- Removed `voiceUrl` plumbing from `mw-api.js`, `console.js`, `console.html`; `avatar.js` `playWavAndLipSync` now accepts mime type
+- Deleted entire `kiosk-voice/` directory (Python server, Piper voices, faster-whisper, venv)
+- Added `tts.service.spec.ts` (5 tests) and `stt.service.spec.ts` (6 tests); all 19 tests pass
+
+**Notes:** Set `ELEVENLABS_API_KEY` and `ELEVENLABS_TTS_VOICE_ID` in `.env` for real speech, or use `TTS_ADAPTER=stub` / `STT_ADAPTER=stub` for demos without a key. The kiosk now requires outbound internet to ElevenLabs when using the elevenlabs adapter; touch keypad works as degraded fallback.
+
+## [2026-08-11 12:30] Implement all 7 architecture deepening candidates for middleware
+
+**By:** @mahmoudgamalmatter
+
+**Requested:** Implement all architecture deepening candidates from the review (absorb slots, deepen repo, fix circular DI, deepen event bus, wire adapter seams, fix demo reach, centralize plate lifecycle).
+
+**Changes:**
+- Absorbed SlotsModule into QueueEngineModule — deleted `slots/slots.service.ts`, `slots/slots.module.ts`, `slots/slots.controller.ts`; moved slot logic into `queue-engine/queue-engine.service.ts` and new `queue-engine/slots.controller.ts`
+- Deepened QueueRepository with `reserveNextForSlot()` and `confirmAndAssign()` high-level methods, simplified service orchestration
+- Fixed KioskGateway circular DI using `forwardRef`, removed manual `bindService()` hack and `OnModuleInit` wiring in `kiosk/kiosk.module.ts`
+- Added `BaseDomainPayload` base type, unified `GateOpenCommandedPayload`/`GateOpenedPayload` into `GateEventPayload`, added typed `DomainEventMap` for compile-time event safety in `events/domain-events.ts`
+- Wired env-driven adapter factories for Gate, Notifications, and SAP modules; added `GATE_ADAPTER` and `NOTIFICATION_ADAPTER` env vars to `config/env.validation.ts` and `.env.example`
+- Added `purge()` methods to QueueRepository, SessionStore, LprService, AuditService; refactored DemoService to call module-owned purge instead of scanning Redis keys cross-module; moved `DEMO_SAP_KEY` into `sap/fake-sap.adapter.ts`
+- Centralized plate lifecycle TTLs into `PlateActiveReason` enum and `TTL_BY_REASON` map in `lpr/lpr.service.ts`; callers now pass reason instead of raw TTL values
+
+**Notes:** All 8 unit tests pass. TypeScript compiles cleanly. The `dto/slot-freed.dto.ts` file is kept under `queue-engine/dto/` (old copy under `slots/dto/` remains for reference but is unused). Architecture HTML report at `/tmp/architecture-review-20260811.html`.
+
+## [2026-08-11 12:00] Full middleware code review + architecture deepening scan
+
+**By:** @mahmoudgamalmatter
+
+**Requested:** Full review of the middleware codebase — two-axis code review (Standards + Spec) and architecture deepening opportunity scan with HTML report.
+
+**Changes:**
+- Ran two-axis code review (Standards smell baseline + Spec coverage) across `middleware/` diff since `38fc949`
+- Produced architecture deepening scan with 7 candidates (2 Strong, 4 Worth exploring, 1 Speculative)
+- Generated self-contained HTML report at `/tmp/architecture-review-20260811.html` (Tailwind + Mermaid)
+
+**Notes:** No `CODING_STANDARDS.md` or `CONTEXT.md` exists — Standards axis ran purely on Fowler smell baseline. Spec axis used the demo-console plan and README as closest available specs. Top architecture recommendation: absorb SlotsModule into QueueEngineService.
+
 ## [2026-08-09 17:15] Multi-slot free + concurrent queue notifies
 
 **By:** @MahmoudMater

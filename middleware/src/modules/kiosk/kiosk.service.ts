@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PinoLogger } from 'nestjs-pino';
 import { randomUUID } from 'crypto';
@@ -28,6 +28,7 @@ export class KioskService {
   constructor(
     private readonly store: SessionStore,
     private readonly events: DomainEventBus,
+    @Inject(forwardRef(() => KioskGateway))
     private readonly gateway: KioskGateway,
     private readonly lpr: LprService,
     private readonly logger: PinoLogger,
@@ -43,7 +44,7 @@ export class KioskService {
       profile: payload.profile,
     });
     await this.store.save(session);
-    await this.lpr.markActive(payload.plateNumber, payload.gateId, 3600);
+    await this.lpr.markActive(payload.plateNumber, payload.gateId, 'kiosk_session');
 
     const started: KioskSessionStartedPayload = {
       sessionId: session.sessionId,

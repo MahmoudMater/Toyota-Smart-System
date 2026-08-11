@@ -115,8 +115,9 @@
       throw new Error(err);
     }
     const buf = await res.arrayBuffer();
-    ttsStatus.textContent = `WAV ${buf.byteLength} bytes — playing`;
-    await avatar.playWavAndLipSync(buf, ttsAudio);
+    const ct = res.headers.get("content-type") || "audio/mpeg";
+    ttsStatus.textContent = `Audio ${buf.byteLength} bytes — playing`;
+    await avatar.playWavAndLipSync(buf, ttsAudio, ct);
     ttsStatus.textContent = "Done";
   }
 

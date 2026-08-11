@@ -1,4 +1,4 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { LprModule } from '../lpr/lpr.module';
 import { KioskController } from './kiosk.controller';
 import { KioskGateway } from './kiosk.gateway';
@@ -9,15 +9,6 @@ import { SessionStore } from './session.store';
   imports: [LprModule],
   controllers: [KioskController],
   providers: [SessionStore, KioskGateway, KioskService],
-  exports: [KioskService, KioskGateway],
+  exports: [KioskService, KioskGateway, SessionStore],
 })
-export class KioskModule implements OnModuleInit {
-  constructor(
-    private readonly gateway: KioskGateway,
-    private readonly service: KioskService,
-  ) {}
-
-  onModuleInit(): void {
-    this.gateway.bindService(this.service);
-  }
-}
+export class KioskModule {}

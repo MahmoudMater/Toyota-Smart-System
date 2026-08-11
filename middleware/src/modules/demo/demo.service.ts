@@ -5,11 +5,12 @@ import { PinoLogger } from 'nestjs-pino';
 import type { Env } from '../../config/env.validation';
 import type { ClientProfile } from '../../events/domain-events';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
-import {
-  AUDIT_STREAM_KEY,
-  DEMO_KEY_PATTERNS,
-  DEMO_SAP_KEY,
-} from './demo.keys';
+import { AuditService } from '../audit/audit.service';
+import { SessionStore } from '../kiosk/session.store';
+import { LprService } from '../lpr/lpr.service';
+import { QueueRepository } from '../queue-engine/queue.repository';
+import { TtsService } from '../tts/tts.service';
+import { DEMO_SAP_KEY } from './demo.keys';
 import type { SapProfileDto } from './dto/sap-profile.dto';
 
 @Injectable()
@@ -17,6 +18,11 @@ export class DemoService {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly config: ConfigService<Env, true>,
+    private readonly queueRepo: QueueRepository,
+    private readonly sessionStore: SessionStore,
+    private readonly lprService: LprService,
+    private readonly auditService: AuditService,
+    private readonly ttsService: TtsService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(DemoService.name);
@@ -52,35 +58,24 @@ export class DemoService {
 
   async reset(): Promise<{ deleted: number }> {
     let deleted = 0;
-    for (const pattern of DEMO_KEY_PATTERNS) {
-      deleted += await this.deleteByPattern(pattern);
-    }
-    // Clear audit stream
-    const auditExists = await this.redis.exists(AUDIT_STREAM_KEY);
-    if (auditExists) {
-      await this.redis.del(AUDIT_STREAM_KEY);
-      deleted += 1;
-    }
+    deleted += await this.queueRepo.purge();
+    deleted += await this.sessionStore.purge();
+    deleted += await this.lprService.purge();
+    deleted += await this.auditService.purge();
+    deleted += await this.ttsService.purge();
+    deleted += await this.purgeDemoSapKeys();
     this.logger.info({ deleted }, 'demo.reset');
     return { deleted };
   }
 
-  private async deleteByPattern(pattern: string): Promise<number> {
+  private async purgeDemoSapKeys(): Promise<number> {
+    let deleted = 0;
     let cursor = '0';
-    let count = 0;
     do {
-      const [next, keys] = await this.redis.scan(
-        cursor,
-        'MATCH',
-        pattern,
-        'COUNT',
-        100,
-      );
+      const [next, keys] = await this.redis.scan(cursor, 'MATCH', 'demo:sap:*', 'COUNT', 100);
       cursor = next;
-      if (keys.length) {
-        count += await this.redis.del(...keys);
-      }
+      if (keys.length) deleted += await this.redis.del(...keys);
     } while (cursor !== '0');
-    return count;
+    return deleted;
   }
 }

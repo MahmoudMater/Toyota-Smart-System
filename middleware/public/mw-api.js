@@ -1,14 +1,13 @@
 /**
  * Middleware UI service layer for the demo console.
  * All HTTP/Socket.io calls to NestJS go through here — page logic stays free of fetch URLs.
+ * TTS and STT now go through the same middleware origin (no separate voice server).
  */
 (function (global) {
   "use strict";
 
   const STORAGE_KEY = "tamkeen.demo.mwUrl";
-  const VOICE_STORAGE_KEY = "tamkeen.demo.voiceUrl";
   const DEFAULT_MW = "http://127.0.0.1:3000";
-  const DEFAULT_VOICE = "http://127.0.0.1:8080";
 
   function normalizeBase(url, fallback) {
     return String(url || fallback).replace(/\/$/, "");
@@ -18,10 +17,6 @@
     let baseUrl = normalizeBase(
       options.baseUrl || localStorage.getItem(STORAGE_KEY),
       DEFAULT_MW
-    );
-    let voiceUrl = normalizeBase(
-      options.voiceUrl || localStorage.getItem(VOICE_STORAGE_KEY),
-      DEFAULT_VOICE
     );
     let socket = null;
     let joinedGate = null;
@@ -40,23 +35,8 @@
       return baseUrl;
     }
 
-    function setVoiceUrl(url) {
-      voiceUrl = normalizeBase(url, DEFAULT_VOICE);
-      localStorage.setItem(VOICE_STORAGE_KEY, voiceUrl);
-    }
-
-    function getVoiceUrl() {
-      return voiceUrl;
-    }
-
-    async function voiceHealth() {
-      const res = await fetch(`${voiceUrl}/health`);
-      if (!res.ok) throw new Error(`Voice HTTP ${res.status}`);
-      return res.json();
-    }
-
     async function tts(text, lang = "en") {
-      const res = await fetch(`${voiceUrl}/tts`, {
+      const res = await fetch(`${baseUrl}/tts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, lang }),
@@ -69,7 +49,7 @@
     }
 
     async function stt(formData) {
-      const res = await fetch(`${voiceUrl}/stt`, {
+      const res = await fetch(`${baseUrl}/stt`, {
         method: "POST",
         body: formData,
       });
@@ -136,7 +116,6 @@
     function setAvailableSlots(available) {
       return request("PUT", "/slots/available", { available: Number(available) });
     }
-    /** Free N slots → notify up to N waiting customers. */
     function freedBatch(count) {
       const body = count != null ? { count: Number(count) } : {};
       return request("POST", "/slots/freed-batch", body);
@@ -196,7 +175,6 @@
     function emitSessionInput(sessionId, payload) {
       return new Promise((resolve, reject) => {
         if (!socket?.connected) {
-          // REST fallback
           sessionInput(sessionId, payload).then(resolve).catch(reject);
           return;
         }
@@ -233,9 +211,6 @@
     return {
       setBaseUrl,
       getBaseUrl,
-      setVoiceUrl,
-      getVoiceUrl,
-      voiceHealth,
       tts,
       stt,
       demoConfig,
@@ -264,8 +239,6 @@
   global.TamkeenMwApi = {
     createMwApi,
     DEFAULT_MW,
-    DEFAULT_VOICE,
     STORAGE_KEY,
-    VOICE_STORAGE_KEY,
   };
 })(window);

@@ -4,8 +4,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { DomainEventBus } from '../../events/domain-event-bus';
 import { DomainEvents } from '../../events/domain-events';
 import type {
-  GateOpenCommandedPayload,
-  GateOpenedPayload,
+  GateEventPayload,
   KioskIdentityConfirmedPayload,
   KioskPhoneCapturedPayload,
 } from '../../events/domain-events';
@@ -37,21 +36,15 @@ export class GateService {
   private async openForVisit(
     payload: KioskIdentityConfirmedPayload | KioskPhoneCapturedPayload,
   ): Promise<void> {
-    const commanded: GateOpenCommandedPayload = {
+    const gatePayload: GateEventPayload = {
       gateId: payload.gateId,
       sessionId: payload.sessionId,
       plateNumber: payload.plateNumber,
       correlationId: payload.correlationId,
     };
-    this.events.emit(DomainEvents.GateOpenCommanded, commanded);
+    this.events.emit(DomainEvents.GateOpenCommanded, gatePayload);
     await this.gate.openGate(payload.gateId);
-    const opened: GateOpenedPayload = {
-      gateId: payload.gateId,
-      sessionId: payload.sessionId,
-      plateNumber: payload.plateNumber,
-      correlationId: payload.correlationId,
-    };
-    this.events.emit(DomainEvents.GateOpened, opened);
+    this.events.emit(DomainEvents.GateOpened, gatePayload);
     this.logger.info(
       { gateId: payload.gateId, sessionId: payload.sessionId },
       'gate.opened',

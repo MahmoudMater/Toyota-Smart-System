@@ -33,6 +33,17 @@ export class SessionStore {
     return JSON.parse(raw) as KioskSession;
   }
 
+  async purge(): Promise<number> {
+    let deleted = 0;
+    let cursor = '0';
+    do {
+      const [next, keys] = await this.redis.scan(cursor, 'MATCH', 'kiosk:*', 'COUNT', 100);
+      cursor = next;
+      if (keys.length) deleted += await this.redis.del(...keys);
+    } while (cursor !== '0');
+    return deleted;
+  }
+
   async getActiveForGate(gateId: string): Promise<KioskSession | null> {
     const sessionId = await this.redis.get(gateActiveKey(gateId));
     if (!sessionId) return null;

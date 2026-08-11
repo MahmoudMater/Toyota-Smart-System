@@ -51,6 +51,15 @@ export class AuditService implements OnModuleInit {
     }
   }
 
+  async purge(): Promise<number> {
+    const exists = await this.redis.exists(AUDIT_STREAM_KEY);
+    if (exists) {
+      await this.redis.del(AUDIT_STREAM_KEY);
+      return 1;
+    }
+    return 0;
+  }
+
   async recent(count = 50): Promise<
     Array<{ id: string; event: string; payload: unknown; at: string }>
   > {

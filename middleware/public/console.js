@@ -6,7 +6,6 @@
   const api = window.TamkeenMwApi.createMwApi();
 
   const middlewareUrl = $("middlewareUrl");
-  const voiceUrl = $("voiceUrl");
   const gateId = $("gateId");
   const connectBtn = $("connectBtn");
   const resetBtn = $("resetBtn");
@@ -82,7 +81,6 @@
 
   // Prefill URLs from storage
   middlewareUrl.value = api.getBaseUrl();
-  voiceUrl.value = api.getVoiceUrl();
 
   // Keypad
   ["1", "2", "3", "4", "5", "6", "7", "8", "9", "⌫", "0", "✓"].forEach((key) => {
@@ -121,12 +119,11 @@
     speaking = true;
     avatar.setState("talking");
     try {
-      api.setVoiceUrl(voiceUrl.value.trim());
       const buf = await api.tts(text, lang);
-      await avatar.playWavAndLipSync(buf, ttsAudio);
+      await avatar.playWavAndLipSync(buf, ttsAudio, "audio/mpeg");
     } catch (err) {
       console.warn("TTS failed", err);
-      sessionStatus.textContent = `TTS error: ${err.message || err}. Is the voice server running at ${api.getVoiceUrl()}?`;
+      sessionStatus.textContent = `TTS error: ${err.message || err}. Is the middleware running at ${api.getBaseUrl()}?`;
       avatar.setState("idle");
     } finally {
       speaking = false;
@@ -344,18 +341,16 @@
 
   async function connect() {
     api.setBaseUrl(middlewareUrl.value.trim());
-    api.setVoiceUrl(voiceUrl.value.trim());
     configStatus.textContent = "Connecting…";
     setConn(false, "Connecting…");
     try {
-      const [health, voice, cfg] = await Promise.all([
+      const [health, cfg] = await Promise.all([
         api.health(),
-        api.voiceHealth(),
         api.demoConfig(),
       ]);
       claimTimeoutMs = cfg.claimTimeoutMs || 50_000;
       configStatus.textContent =
-        `OK · middleware ${health.service || "up"} · voice TTS=${voice.tts_voices || "?"} · claim ${claimTimeoutMs / 1000}s`;
+        `OK · middleware ${health.service || "up"} · TTS=${health.tts_voices || "?"} · STT=${health.stt_model || "?"} · claim ${claimTimeoutMs / 1000}s`;
 
       api.connectSocket({
         onConnect: () => {
@@ -378,7 +373,7 @@
       await refreshAll();
     } catch (err) {
       configStatus.textContent =
-        `Connect failed: ${err.message || err}. Middleware ${api.getBaseUrl()} · Voice ${api.getVoiceUrl()}`;
+        `Connect failed: ${err.message || err}. Middleware ${api.getBaseUrl()}`;
       setConn(false, "Failed");
     }
   }
@@ -578,7 +573,6 @@
       const form = new FormData();
       form.append("audio", blob, `answer.${ext}`);
       form.append("lang", "en");
-      api.setVoiceUrl(voiceUrl.value.trim());
       const sttData = await api.stt(form);
       recordStatus.textContent = `Heard: ${sttData.text || "(empty)"}`;
       const payload = { source: "stt", text: sttData.text };

@@ -1,12 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PinoLogger } from 'nestjs-pino';
-import { DomainEventName } from './domain-events';
+import type { DomainEventMap, DomainEventName } from './domain-events';
 
-/**
- * Thin wrapper so every domain emit is logged ("the talking").
- * AuditModule still listens via EventEmitter2 wildcards.
- */
 @Injectable()
 export class DomainEventBus {
   constructor(
@@ -16,7 +12,10 @@ export class DomainEventBus {
     this.logger.setContext(DomainEventBus.name);
   }
 
-  emit<T extends object>(event: DomainEventName, payload: T): boolean {
+  emit<E extends DomainEventName>(
+    event: E,
+    payload: E extends keyof DomainEventMap ? DomainEventMap[E] : object,
+  ): boolean {
     this.logger.info({ event, payload }, 'domain.event.emit');
     return this.emitter.emit(event, payload);
   }

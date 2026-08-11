@@ -5,20 +5,20 @@ import {
   SetAvailableSlotsDto,
   SlotFreedDto,
 } from './dto/slot-freed.dto';
-import { SlotsService } from './slots.service';
+import { QueueEngineService } from './queue-engine.service';
 
 @Controller('slots')
 export class SlotsController {
-  constructor(private readonly slots: SlotsService) {}
+  constructor(private readonly engine: QueueEngineService) {}
 
   @Get('available')
   getAvailable() {
-    return this.slots.getAvailable();
+    return this.engine.getAvailable();
   }
 
   @Put('available')
   setAvailable(@Body() dto: SetAvailableSlotsDto) {
-    return this.slots.setAvailable(dto);
+    return this.engine.setAvailable(dto);
   }
 
   @Post('freed')
@@ -26,15 +26,14 @@ export class SlotsController {
     @Body() dto: SlotFreedDto,
     @Headers(CORRELATION_HEADER) correlationId?: string,
   ) {
-    return this.slots.freed(dto, correlationId);
+    return this.engine.freed(dto, correlationId);
   }
 
-  /** Free N slots → notify up to N waiting queue entries (concurrent per-slot claims). */
   @Post('freed-batch')
   freedBatch(
     @Body() dto: FreedBatchDto,
     @Headers(CORRELATION_HEADER) correlationId?: string,
   ) {
-    return this.slots.freedBatch(dto, correlationId);
+    return this.engine.freedBatch(dto, correlationId);
   }
 }

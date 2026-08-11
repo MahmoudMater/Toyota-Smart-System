@@ -1,6 +1,6 @@
 import { ClientProfile } from '../../events/domain-events';
 import * as i18n from './i18n';
-import { extractDigits, normalizeYesNo } from './normalize';
+import { extractDigits, normalizeYesNo } from '../../common/normalize';
 
 export const MAX_RETRIES = 3;
 

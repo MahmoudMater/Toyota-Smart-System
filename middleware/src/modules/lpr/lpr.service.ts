@@ -8,7 +8,14 @@ import { PlateReadDto } from './dto/plate-read.dto';
 
 const ACTIVE_SESSION_KEY = (plate: string) =>
   `lpr:active:${plate.trim().toUpperCase().replace(/\s+/g, '')}`;
-const DEDUPE_TTL_SECONDS = 120;
+
+export type PlateActiveReason = 'lpr_dedupe' | 'kiosk_session' | 'queue_enqueued';
+
+const TTL_BY_REASON: Record<PlateActiveReason, number> = {
+  lpr_dedupe: 120,
+  kiosk_session: 3600,
+  queue_enqueued: 86_400,
+};
 
 export interface PlateReadResult {
   accepted: boolean;
@@ -49,13 +56,7 @@ export class LprService {
       };
     }
 
-    // Mark plate active until session completes / fails (also cleared on enqueue path).
-    await this.redis.set(
-      key,
-      JSON.stringify({ gateId, at: new Date().toISOString() }),
-      'EX',
-      DEDUPE_TTL_SECONDS,
-    );
+    await this.markActive(plateNumber, gateId, 'lpr_dedupe');
 
     const payload: LprPlateReadPayload = {
       gateId,
@@ -68,16 +69,32 @@ export class LprService {
     return { accepted: true, plateNumber, gateId };
   }
 
+  async purge(): Promise<number> {
+    let deleted = 0;
+    let cursor = '0';
+    do {
+      const [next, keys] = await this.redis.scan(cursor, 'MATCH', 'lpr:active:*', 'COUNT', 100);
+      cursor = next;
+      if (keys.length) deleted += await this.redis.del(...keys);
+    } while (cursor !== '0');
+    return deleted;
+  }
+
   async clearActive(plateNumber: string): Promise<void> {
     await this.redis.del(ACTIVE_SESSION_KEY(plateNumber));
   }
 
-  async markActive(plateNumber: string, gateId: string, ttlSeconds = 3600): Promise<void> {
+  async markActive(
+    plateNumber: string,
+    gateId: string,
+    reason: PlateActiveReason = 'lpr_dedupe',
+  ): Promise<void> {
+    const ttl = TTL_BY_REASON[reason];
     await this.redis.set(
       ACTIVE_SESSION_KEY(plateNumber),
-      JSON.stringify({ gateId, at: new Date().toISOString() }),
+      JSON.stringify({ gateId, reason, at: new Date().toISOString() }),
       'EX',
-      ttlSeconds,
+      ttl,
     );
   }
 }

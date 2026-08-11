@@ -1,8 +1,9 @@
 import { InjectQueue, Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Job, Queue } from 'bullmq';
+import Redis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
 import type { Env } from '../../config/env.validation';
 import { DomainEventBus } from '../../events/domain-event-bus';
@@ -16,11 +17,14 @@ import type {
   QueueEnqueuedPayload,
   QueueNotifiedPayload,
   QueueShiftedPayload,
+  SlotFreedPayload,
 } from '../../events/domain-events';
+import { REDIS_CLIENT } from '../../redis/redis.constants';
 import { LprService } from '../lpr/lpr.service';
 import { CLAIM_TIMERS_QUEUE } from './claim-timer.types';
 import type { ClaimTimerJobData } from './claim-timer.types';
-import { nextShiftDistance } from './queue.logic';
+import type { FreedBatchDto, SetAvailableSlotsDto, SlotFreedDto } from './dto/slot-freed.dto';
+import { nextShiftDistance, SLOTS_AVAILABLE_KEY } from './queue.logic';
 import { QueueRepository } from './queue.repository';
 
 @Injectable()
@@ -31,10 +35,85 @@ export class QueueEngineService {
     private readonly lpr: LprService,
     private readonly config: ConfigService<Env, true>,
     @InjectQueue(CLAIM_TIMERS_QUEUE) private readonly claimTimers: Queue,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(QueueEngineService.name);
   }
+
+  /* ─── Slot management (absorbed from SlotsService) ─── */
+
+  async getAvailable(): Promise<{
+    available: number;
+    activeClaims: Awaited<ReturnType<QueueEngineService['listActiveClaims']>>;
+  }> {
+    const raw = await this.redis.get(SLOTS_AVAILABLE_KEY);
+    const available = raw ? Number(raw) : 0;
+    const activeClaims = await this.listActiveClaims();
+    return {
+      available: Number.isFinite(available) ? available : 0,
+      activeClaims,
+    };
+  }
+
+  async setAvailable(dto: SetAvailableSlotsDto): Promise<{ available: number }> {
+    await this.redis.set(SLOTS_AVAILABLE_KEY, String(dto.available));
+    this.logger.info({ available: dto.available }, 'slots.available.set');
+    return { available: dto.available };
+  }
+
+  freed(dto: SlotFreedDto, correlationId?: string): SlotFreedPayload {
+    const payload: SlotFreedPayload = {
+      slotId: dto.slotId,
+      freedAt: dto.freedAt ?? new Date().toISOString(),
+      correlationId,
+    };
+    this.logger.info(payload, 'slot.freed.ingest');
+    this.events.emit(DomainEvents.SlotFreed, payload);
+    void this.tryNotifyNext(payload.slotId, correlationId);
+    return payload;
+  }
+
+  async freedBatch(
+    dto: FreedBatchDto,
+    correlationId?: string,
+  ): Promise<{
+    requested: number;
+    notified: number;
+    slots: Array<{ slotId: string; notified: boolean }>;
+    available: number;
+  }> {
+    const stored = await this.getAvailable();
+    const requested = dto.count ?? stored.available;
+    if (requested < 1) {
+      return { requested: 0, notified: 0, slots: [], available: stored.available };
+    }
+
+    const slots: Array<{ slotId: string; notified: boolean }> = [];
+    let notified = 0;
+    const stamp = Date.now();
+
+    for (let i = 1; i <= requested; i++) {
+      const slotId = `slot-${stamp}-${i}`;
+      const payload: SlotFreedPayload = {
+        slotId,
+        freedAt: new Date().toISOString(),
+        correlationId,
+      };
+      this.events.emit(DomainEvents.SlotFreed, payload);
+      const ok = await this.tryNotifyNext(slotId, correlationId);
+      if (ok) notified += 1;
+      slots.push({ slotId, notified: ok });
+    }
+
+    const remaining = Math.max(0, stored.available - requested);
+    await this.redis.set(SLOTS_AVAILABLE_KEY, String(remaining));
+
+    this.logger.info({ requested, notified, remaining }, 'slots.freed_batch');
+    return { requested, notified, slots, available: remaining };
+  }
+
+  /* ─── Queue event handlers ─── */
 
   @OnEvent(DomainEvents.KioskIdentityConfirmed)
   async onIdentityConfirmed(
@@ -74,120 +153,89 @@ export class QueueEngineService {
       correlationId: payload.correlationId,
     };
     this.events.emit(DomainEvents.QueueEnqueued, enqueued);
-    await this.lpr.markActive(entry.plateNumber, entry.gateId, 86_400);
+    await this.lpr.markActive(entry.plateNumber, entry.gateId, 'queue_enqueued');
   }
 
   @OnEvent(DomainEvents.QueueClaimConfirmed)
   async onClaimConfirmed(payload: QueueClaimConfirmedPayload): Promise<void> {
-    const claim = await this.repo.getActiveClaim(payload.slotId);
-    if (!claim || claim.entryId !== payload.entryId) {
+    const result = await this.repo.confirmAndAssign(payload.entryId, payload.slotId);
+    if (!result) {
       this.logger.warn(
         { entryId: payload.entryId, slotId: payload.slotId },
         'queue.claim.late_or_mismatch',
       );
       return;
     }
-    await this.repo.markConfirmed(payload.entryId);
-    const assigned = await this.repo.assignAndRemove(payload.entryId);
-    if (!assigned) return;
 
-    if (claim.claimJobId) {
+    if (result.claim.claimJobId) {
       try {
-        const job = await this.claimTimers.getJob(claim.claimJobId);
+        const job = await this.claimTimers.getJob(result.claim.claimJobId);
         await job?.remove();
       } catch {
-        /* ignore */
+        /* timer already gone */
       }
     }
 
     const assignedPayload: QueueAssignedPayload = {
-      entryId: assigned.id,
-      plateNumber: assigned.plateNumber,
+      entryId: result.entry.id,
+      plateNumber: result.entry.plateNumber,
       slotId: payload.slotId,
       assignedAt: new Date().toISOString(),
       correlationId: payload.correlationId,
     };
     this.events.emit(DomainEvents.QueueAssigned, assignedPayload);
-    await this.lpr.clearActive(assigned.plateNumber);
+    await this.lpr.clearActive(result.entry.plateNumber);
   }
 
   /**
-   * Notify the next waiting entry for this slot.
-   * Per-slot claims allow N free slots → N concurrent notifies.
-   * A short Redis lock prevents two frees from grabbing the same entry.
+   * Reserve the next waiting entry for this slot, schedule a claim timer,
+   * and emit the notified event. Returns true if a reservation was made.
    */
   async tryNotifyNext(
     slotId: string,
     correlationId?: string,
   ): Promise<boolean> {
-    const existing = await this.repo.getActiveClaim(slotId);
-    if (existing) {
-      this.logger.info(
-        { slotId, existing },
-        'queue.notify.skipped_slot_busy',
-      );
-      return false;
-    }
+    const delay = this.config.get('CLAIM_TIMEOUT_MS', { infer: true });
 
-    // Retry lock a few times so batch frees don't drop notifies
-    let locked = false;
-    for (let i = 0; i < 20; i++) {
-      locked = await this.repo.acquireNotifyLock(2000);
-      if (locked) break;
-      await new Promise((r) => setTimeout(r, 25));
-    }
-    if (!locked) {
-      this.logger.warn({ slotId }, 'queue.notify.lock_timeout');
-      return false;
-    }
+    const tempJobId = `claim-pending-${slotId}-${Date.now()}`;
+    const job = await this.claimTimers.add(
+      'claim-timeout',
+      { entryId: '', slotId, plateNumber: '', phone: '', consecutiveMissesAtNotify: 0, correlationId } as ClaimTimerJobData,
+      { delay, removeOnComplete: true, removeOnFail: 100, jobId: tempJobId },
+    );
 
-    try {
-      if (await this.repo.getActiveClaim(slotId)) {
-        return false;
-      }
-      const next = await this.repo.peekWaiting();
-      if (!next) {
+    const reservation = await this.repo.reserveNextForSlot(slotId, String(job.id));
+    if (!reservation) {
+      try { await job.remove(); } catch { /* already gone */ }
+      if (!(await this.repo.getActiveClaim(slotId))) {
         this.logger.info({ slotId }, 'queue.empty');
-        return false;
       }
-
-      const consecutiveMisses = await this.repo.getConsecutiveMisses(slotId);
-      const delay = this.config.get('CLAIM_TIMEOUT_MS', { infer: true });
-      const jobData: ClaimTimerJobData = {
-        entryId: next.id,
-        slotId,
-        plateNumber: next.plateNumber,
-        phone: next.phone,
-        consecutiveMissesAtNotify: consecutiveMisses,
-        correlationId,
-      };
-      const job = await this.claimTimers.add('claim-timeout', jobData, {
-        delay,
-        removeOnComplete: true,
-        removeOnFail: 100,
-        jobId: `claim-${next.id}-${slotId}-${Date.now()}`,
-      });
-
-      const notified = await this.repo.markNotified(
-        next,
-        slotId,
-        String(job.id),
-      );
-      const notifiedPayload: QueueNotifiedPayload = {
-        entryId: notified.id,
-        plateNumber: notified.plateNumber,
-        phone: notified.phone,
-        slotId,
-        claimJobId: String(job.id),
-        notifiedAt: notified.notifiedAt!,
-        consecutiveMisses,
-        correlationId,
-      };
-      this.events.emit(DomainEvents.QueueNotified, notifiedPayload);
-      return true;
-    } finally {
-      await this.repo.releaseNotifyLock();
+      return false;
     }
+
+    const { entry, consecutiveMisses } = reservation;
+    const jobData: ClaimTimerJobData = {
+      entryId: entry.id,
+      slotId,
+      plateNumber: entry.plateNumber,
+      phone: entry.phone,
+      consecutiveMissesAtNotify: consecutiveMisses,
+      correlationId,
+    };
+    await job.updateData(jobData);
+
+    const notifiedPayload: QueueNotifiedPayload = {
+      entryId: entry.id,
+      plateNumber: entry.plateNumber,
+      phone: entry.phone,
+      slotId,
+      claimJobId: String(job.id),
+      notifiedAt: entry.notifiedAt!,
+      consecutiveMisses,
+      correlationId,
+    };
+    this.events.emit(DomainEvents.QueueNotified, notifiedPayload);
+    return true;
   }
 
   async handleClaimTimeout(data: ClaimTimerJobData): Promise<void> {

@@ -1,3 +1,4 @@
+import { forwardRef, Inject } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -9,6 +10,7 @@ import {
 } from '@nestjs/websockets';
 import { PinoLogger } from 'nestjs-pino';
 import { Server, Socket } from 'socket.io';
+import { KioskService } from './kiosk.service';
 import { PublicSession, SessionInput } from './state-machine';
 
 export const gateRoom = (gateId: string) => `gate:${gateId}`;
@@ -23,27 +25,12 @@ export class KioskGateway
   @WebSocketServer()
   server!: Server;
 
-  private kioskService?: {
-    handleSessionInput: (
-      sessionId: string,
-      input: SessionInput,
-      correlationId?: string,
-    ) => Promise<PublicSession | null>;
-  };
-
-  constructor(private readonly logger: PinoLogger) {
+  constructor(
+    @Inject(forwardRef(() => KioskService))
+    private readonly kioskService: KioskService,
+    private readonly logger: PinoLogger,
+  ) {
     this.logger.setContext(KioskGateway.name);
-  }
-
-  /** Avoid circular DI: set by KioskModule after both are constructed. */
-  bindService(service: {
-    handleSessionInput: (
-      sessionId: string,
-      input: SessionInput,
-      correlationId?: string,
-    ) => Promise<PublicSession | null>;
-  }): void {
-    this.kioskService = service;
   }
 
   handleConnection(client: Socket): void {
@@ -79,9 +66,6 @@ export class KioskGateway
       { socketId: client.id, sessionId: body.sessionId, source: body.source },
       'kiosk.socket.session.input',
     );
-    if (!this.kioskService) {
-      return { ok: false, error: 'service_not_ready' };
-    }
     const session = await this.kioskService.handleSessionInput(
       body.sessionId,
       {

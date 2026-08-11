@@ -10,6 +10,7 @@ import {
 } from './queue-engine.service';
 import { QueueController } from './queue.controller';
 import { QueueRepository } from './queue.repository';
+import { SlotsController } from './slots.controller';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { QueueRepository } from './queue.repository';
     }),
     BullModule.registerQueue({ name: CLAIM_TIMERS_QUEUE }),
   ],
-  controllers: [QueueController],
+  controllers: [QueueController, SlotsController],
   providers: [QueueRepository, QueueEngineService, ClaimTimerProcessor],
   exports: [QueueEngineService, QueueRepository],
 })

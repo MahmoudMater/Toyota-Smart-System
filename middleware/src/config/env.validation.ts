@@ -14,9 +14,19 @@ export const envSchema = z.object({
   SESSION_TTL_SECONDS: z.coerce.number().default(1800),
   SAP_ADAPTER: z.enum(['fake', 'http']).default('fake'),
   SAP_BASE_URL: z.string().optional().default(''),
+  GATE_ADAPTER: z.enum(['stub', 'real']).default('stub'),
+  NOTIFICATION_ADAPTER: z.enum(['stub', 'real']).default('stub'),
+  TTS_ADAPTER: z.enum(['elevenlabs', 'stub']).default('elevenlabs'),
+  STT_ADAPTER: z.enum(['elevenlabs', 'stub']).default('elevenlabs'),
+  ELEVENLABS_API_KEY: z.string().optional().default(''),
+  ELEVENLABS_TTS_VOICE_ID: z.string().optional().default(''),
+  ELEVENLABS_TTS_MODEL_ID: z.string().default('eleven_multilingual_v2'),
+  ELEVENLABS_TTS_OUTPUT_FORMAT: z.string().default('mp3_44100_128'),
+  ELEVENLABS_STT_MODEL_ID: z.string().default('scribe_v2'),
+  TTS_CACHE_TTL_SECONDS: z.coerce.number().default(86_400),
   CORS_ORIGINS: z
     .string()
-    .default('http://localhost:8080,http://127.0.0.1:8080'),
+    .default('http://localhost:3000,http://127.0.0.1:3000'),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -200,9 +200,9 @@
       }
     }
 
-    async playWavAndLipSync(arrayBuffer, audioEl) {
+    async playWavAndLipSync(arrayBuffer, audioEl, mimeType) {
       this.setState("talking");
-      const blob = new Blob([arrayBuffer], { type: "audio/wav" });
+      const blob = new Blob([arrayBuffer], { type: mimeType || "audio/mpeg" });
       const url = URL.createObjectURL(blob);
       audioEl.src = url;
 

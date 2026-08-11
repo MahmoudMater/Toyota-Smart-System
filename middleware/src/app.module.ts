@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { LoggerModule } from 'nestjs-pino';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { ConfigService } from '@nestjs/config';
+import { join } from 'path';
 import { AppConfigModule } from './config/config.module';
 import { CommonModule } from './common/common.module';
 import { EventsModule } from './events/events.module';
@@ -12,9 +14,10 @@ import { GateModule } from './modules/gate/gate.module';
 import { KioskModule } from './modules/kiosk/kiosk.module';
 import { QueueEngineModule } from './modules/queue-engine/queue-engine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
-import { SlotsModule } from './modules/slots/slots.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { DemoModule } from './modules/demo/demo.module';
+import { TtsModule } from './modules/tts/tts.module';
+import { SttModule } from './modules/stt/stt.module';
 import { HealthController } from './health.controller';
 import { Env } from './config/env.validation';
 
@@ -41,6 +44,22 @@ import { Env } from './config/env.validation';
       wildcard: false,
       ignoreErrors: false,
     }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),
+      exclude: [
+        '/health(.*)',
+        '/session(.*)',
+        '/queue(.*)',
+        '/slots(.*)',
+        '/lpr(.*)',
+        '/demo(.*)',
+        '/audit(.*)',
+        '/notifications(.*)',
+        '/tts(.*)',
+        '/stt(.*)',
+        '/socket.io(.*)',
+      ],
+    }),
     CommonModule,
     EventsModule,
     RedisModule,
@@ -50,9 +69,10 @@ import { Env } from './config/env.validation';
     KioskModule,
     QueueEngineModule,
     NotificationsModule,
-    SlotsModule,
     AuditModule,
     DemoModule,
+    TtsModule,
+    SttModule,
   ],
   controllers: [HealthController],
 })

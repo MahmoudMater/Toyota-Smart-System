@@ -2,8 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 import type { ClientProfile } from '../../events/domain-events';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
-import { DEMO_SAP_KEY } from '../demo/demo.keys';
 import type { SapClient } from './sap.client';
+
+export const DEMO_SAP_KEY = (plate: string) =>
+  `demo:sap:${plate.trim().toUpperCase().replace(/\s+/g, '')}`;
 
 const FAKE_DIRECTORY: Record<string, ClientProfile> = {
   'ABC 1234': {

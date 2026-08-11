@@ -21,98 +21,94 @@ export const DomainEvents = {
 export type DomainEventName =
   (typeof DomainEvents)[keyof typeof DomainEvents];
 
+/* ─── Shared base ─── */
+
+export interface BaseDomainPayload {
+  correlationId?: string;
+}
+
 export interface ClientProfile {
   name: string;
   phone: string;
   plate: string;
 }
 
-export interface LprPlateReadPayload {
+/* ─── Per-event payloads ─── */
+
+export interface LprPlateReadPayload extends BaseDomainPayload {
   gateId: string;
   plateNumber: string;
   timestamp: string;
   image?: string;
-  correlationId?: string;
 }
 
-export interface SapLookupFoundPayload {
+export interface SapLookupFoundPayload extends BaseDomainPayload {
   gateId: string;
   plateNumber: string;
   profile: ClientProfile;
-  correlationId?: string;
 }
 
-export interface SapLookupNotFoundPayload {
+export interface SapLookupNotFoundPayload extends BaseDomainPayload {
   gateId: string;
   plateNumber: string;
-  correlationId?: string;
 }
 
-export interface KioskSessionStartedPayload {
+export interface KioskSessionStartedPayload extends BaseDomainPayload {
   sessionId: string;
   gateId: string;
   plateNumber: string;
   profile: ClientProfile;
-  correlationId?: string;
 }
 
-export interface KioskIdentityConfirmedPayload {
+export interface KioskIdentityConfirmedPayload extends BaseDomainPayload {
   sessionId: string;
   gateId: string;
   plateNumber: string;
   visitPhone: string;
   profile: ClientProfile;
-  correlationId?: string;
 }
 
-export interface KioskPhoneCapturedPayload {
+export interface KioskPhoneCapturedPayload extends BaseDomainPayload {
   sessionId: string;
   gateId: string;
   plateNumber: string;
   visitPhone: string;
   profile: ClientProfile;
-  correlationId?: string;
 }
 
-export interface KioskStaffEscalationPayload {
+export interface KioskStaffEscalationPayload extends BaseDomainPayload {
   sessionId: string;
   gateId: string;
   plateNumber: string;
   reason: string;
-  correlationId?: string;
 }
 
-export interface GateOpenCommandedPayload {
+export interface GateEventPayload extends BaseDomainPayload {
   gateId: string;
   sessionId: string;
   plateNumber: string;
-  correlationId?: string;
 }
 
-export interface GateOpenedPayload {
-  gateId: string;
-  sessionId: string;
-  plateNumber: string;
-  correlationId?: string;
-}
+/** @deprecated Use GateEventPayload */
+export type GateOpenCommandedPayload = GateEventPayload;
+/** @deprecated Use GateEventPayload */
+export type GateOpenedPayload = GateEventPayload;
 
-export interface QueueEnqueuedPayload {
+export interface QueueEnqueuedPayload extends BaseDomainPayload {
   entryId: string;
   plateNumber: string;
   phone: string;
   gateId: string;
   sessionId: string;
   enqueuedAt: string;
-  correlationId?: string;
 }
 
-export interface SlotFreedPayload {
+export interface SlotFreedPayload extends BaseDomainPayload {
   slotId: string;
   freedAt: string;
-  correlationId?: string;
 }
 
-export interface QueueNotifiedPayload {
+export interface QueueNotifiedPayload extends BaseDomainPayload {
   entryId: string;
   plateNumber: string;
   phone: string;
@@ -120,39 +116,55 @@ export interface QueueNotifiedPayload {
   claimJobId: string;
   notifiedAt: string;
   consecutiveMisses: number;
-  correlationId?: string;
 }
 
-export interface QueueClaimConfirmedPayload {
+export interface QueueClaimConfirmedPayload extends BaseDomainPayload {
   entryId: string;
   plateNumber: string;
   slotId: string;
   confirmedAt: string;
-  correlationId?: string;
 }
 
-export interface QueueClaimTimeoutPayload {
+export interface QueueClaimTimeoutPayload extends BaseDomainPayload {
   entryId: string;
   plateNumber: string;
   slotId: string;
   timedOutAt: string;
   shiftDistance: number;
-  correlationId?: string;
 }
 
-export interface QueueShiftedPayload {
+export interface QueueShiftedPayload extends BaseDomainPayload {
   entryId: string;
   plateNumber: string;
   shiftDistance: number;
   newPosition: number;
   consecutiveMisses: number;
-  correlationId?: string;
 }
 
-export interface QueueAssignedPayload {
+export interface QueueAssignedPayload extends BaseDomainPayload {
   entryId: string;
   plateNumber: string;
   slotId: string;
   assignedAt: string;
-  correlationId?: string;
+}
+
+/* ─── Typed event map for compile-time safety ─── */
+
+export interface DomainEventMap {
+  [DomainEvents.LprPlateRead]: LprPlateReadPayload;
+  [DomainEvents.SapLookupFound]: SapLookupFoundPayload;
+  [DomainEvents.SapLookupNotFound]: SapLookupNotFoundPayload;
+  [DomainEvents.KioskSessionStarted]: KioskSessionStartedPayload;
+  [DomainEvents.KioskIdentityConfirmed]: KioskIdentityConfirmedPayload;
+  [DomainEvents.KioskPhoneCaptured]: KioskPhoneCapturedPayload;
+  [DomainEvents.KioskStaffEscalation]: KioskStaffEscalationPayload;
+  [DomainEvents.GateOpenCommanded]: GateEventPayload;
+  [DomainEvents.GateOpened]: GateEventPayload;
+  [DomainEvents.QueueEnqueued]: QueueEnqueuedPayload;
+  [DomainEvents.SlotFreed]: SlotFreedPayload;
+  [DomainEvents.QueueNotified]: QueueNotifiedPayload;
+  [DomainEvents.QueueClaimConfirmed]: QueueClaimConfirmedPayload;
+  [DomainEvents.QueueClaimTimeout]: QueueClaimTimeoutPayload;
+  [DomainEvents.QueueShifted]: QueueShiftedPayload;
+  [DomainEvents.QueueAssigned]: QueueAssignedPayload;
 }

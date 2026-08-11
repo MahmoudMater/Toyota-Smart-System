@@ -12,6 +12,7 @@ import {
   QUEUE_NOTIFY_LOCK_KEY,
   QUEUE_PLATE_KEY,
   QueueEntry,
+  SLOTS_AVAILABLE_KEY,
 } from './queue.logic';
 
 const ENQUEUE_LUA = `
@@ -35,9 +36,67 @@ export interface ActiveClaim {
   claimJobId: string;
 }
 
+export interface ReservationResult {
+  entry: QueueEntry;
+  consecutiveMisses: number;
+}
+
 @Injectable()
 export class QueueRepository {
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
+
+  /**
+   * Atomically reserve the next waiting entry for a slot.
+   * Handles locking, double-check, peek, and marking — callers
+   * only need to supply the claimJobId after scheduling the timer.
+   */
+  async reserveNextForSlot(
+    slotId: string,
+    claimJobId: string,
+    lockRetries = 20,
+    lockTtlMs = 2000,
+  ): Promise<ReservationResult | null> {
+    const existing = await this.getActiveClaim(slotId);
+    if (existing) return null;
+
+    let locked = false;
+    for (let i = 0; i < lockRetries; i++) {
+      locked = await this.acquireNotifyLock(lockTtlMs);
+      if (locked) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
+    if (!locked) return null;
+
+    try {
+      if (await this.getActiveClaim(slotId)) return null;
+
+      const next = await this.peekWaiting();
+      if (!next) return null;
+
+      const consecutiveMisses = await this.getConsecutiveMisses(slotId);
+      const notified = await this.markNotified(next, slotId, claimJobId);
+      return { entry: notified, consecutiveMisses };
+    } finally {
+      await this.releaseNotifyLock();
+    }
+  }
+
+  /**
+   * Confirm a claim and remove the entry from the queue atomically.
+   * Returns the assigned entry or null if the claim was stale.
+   */
+  async confirmAndAssign(
+    entryId: string,
+    slotId: string,
+  ): Promise<{ entry: QueueEntry; claim: ActiveClaim } | null> {
+    const claim = await this.getActiveClaim(slotId);
+    if (!claim || claim.entryId !== entryId) return null;
+
+    await this.markConfirmed(entryId);
+    const assigned = await this.assignAndRemove(entryId);
+    if (!assigned) return null;
+    return { entry: assigned, claim };
+  }
 
   async enqueue(params: {
     plateNumber: string;
@@ -217,6 +276,19 @@ export class QueueRepository {
       await this.setConsecutiveMisses(slotId, 0);
     }
     return entry;
+  }
+
+  async purge(): Promise<number> {
+    let deleted = 0;
+    let cursor = '0';
+    do {
+      const [next, keys] = await this.redis.scan(cursor, 'MATCH', 'qms:*', 'COUNT', 100);
+      cursor = next;
+      if (keys.length) deleted += await this.redis.del(...keys);
+    } while (cursor !== '0');
+    // Also clear slots:available since it's part of queue accounting
+    const slotsDel = await this.redis.del(SLOTS_AVAILABLE_KEY);
+    return deleted + slotsDel;
   }
 
   async shiftBack(
