@@ -64,9 +64,16 @@
     riveSrc: "./avatar.riv",
   });
 
+  const beyVideo = $("beyVideo");
+  const beyRoom = window.TamkeenBey?.createBeyRoomController({
+    videoEl: beyVideo,
+    statusEl: avatarStatus,
+  });
+
   let sessionId = null;
   let sessionLang = "en";
   let sessionState = "idle";
+  let avatarAdapter = "canvas";
   let claimTimeoutMs = 50_000;
   let activeClaims = []; // [{ entryId, slotId, plateNumber, notifiedAt }]
   let countdownTimer = null;
@@ -114,6 +121,25 @@
     return "";
   }
 
+  async function ensureBeyRoom(data) {
+    if (!beyRoom || data.avatar_adapter !== "bey" || !data.livekit?.token) {
+      return false;
+    }
+    try {
+      $("avatarCanvas")?.classList.add("hidden");
+      $("riveCanvas")?.classList.add("hidden");
+      beyRoom.showBey(true);
+      await beyRoom.connect(data.livekit);
+      return true;
+    } catch (err) {
+      console.warn("LiveKit connect failed, falling back to canvas TTS", err);
+      beyRoom.showBey(false);
+      $("avatarCanvas")?.classList.remove("hidden");
+      avatarStatus.textContent = `bey fallback: ${err.message || err}`;
+      return false;
+    }
+  }
+
   async function speakText(text, lang = sessionLang) {
     if (!text) return;
     speaking = true;
@@ -135,6 +161,7 @@
     sessionId = data.session_id;
     sessionLang = data.lang || "en";
     sessionState = data.state;
+    avatarAdapter = data.avatar_adapter || "canvas";
     promptText.textContent = data.prompt || "";
     sessionStatus.textContent = JSON.stringify(
       {
@@ -143,6 +170,8 @@
         retries: data.retries,
         gate_open_stub: data.gate_open_stub,
         visit_phone: data.visit_phone,
+        avatar_adapter: avatarAdapter,
+        livekit_room: data.livekit?.room || null,
       },
       null,
       2
@@ -167,7 +196,7 @@
     );
     keypadSection.classList.toggle("hidden", data.state !== "awaiting_phone_speech");
 
-    if (data.avatar_state && !speaking) {
+    if (data.avatar_state && !speaking && avatarAdapter !== "bey") {
       avatar.setState(data.avatar_state);
     }
   }
@@ -175,15 +204,29 @@
   async function applyPromptSpeech(data) {
     if (!data?.prompt || data.prompt === lastSpokenPrompt) return;
     lastSpokenPrompt = data.prompt;
-    await speakText(data.speech || data.prompt, data.lang || "en");
+
+    const beyOk =
+      data.avatar_adapter === "bey" ? await ensureBeyRoom(data) : false;
+
+    if (beyOk) {
+      // Nest already sent kiosk.speak to the LiveKit agent — wait for video audio.
+      speaking = true;
+      avatarStatus.textContent = "bey speaking…";
+      // Rough settle; agent drives audio/video over LiveKit
+      await new Promise((r) => setTimeout(r, 800));
+      speaking = false;
+    } else {
+      await speakText(data.speech || data.prompt, data.lang || "en");
+    }
+
     const listening = [
       "awaiting_identity_confirm",
       "awaiting_owner_check",
       "awaiting_phone_speech",
       "awaiting_phone_confirm",
     ];
-    if (listening.includes(data.state)) avatar.setState("listening");
-    else avatar.setState(data.avatar_state || "idle");
+    if (listening.includes(data.state) && !beyOk) avatar.setState("listening");
+    else if (!beyOk) avatar.setState(data.avatar_state || "idle");
   }
 
   async function sendInput(payload) {

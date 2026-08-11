@@ -50,6 +50,12 @@ export interface PublicSession {
   prompt: string;
   speech: string;
   avatar_state: string;
+  avatar_adapter: 'canvas' | 'bey';
+  livekit?: {
+    url: string;
+    token: string;
+    room: string;
+  };
   ui: {
     rtl: boolean;
     yes_label: string;
@@ -107,7 +113,13 @@ function avatarState(state: KioskState): string {
   }
 }
 
-export function toPublic(session: KioskSession): PublicSession {
+export function toPublic(
+  session: KioskSession,
+  extras?: {
+    avatar_adapter?: 'canvas' | 'bey';
+    livekit?: { url: string; token: string; room: string };
+  },
+): PublicSession {
   return {
     session_id: session.sessionId,
     gate_id: session.gateId,
@@ -127,6 +139,8 @@ export function toPublic(session: KioskSession): PublicSession {
     prompt: session.lastPrompt,
     speech: session.lastPromptSpeech,
     avatar_state: avatarState(session.state),
+    avatar_adapter: extras?.avatar_adapter ?? 'canvas',
+    livekit: extras?.livekit,
     ui: {
       rtl: false,
       yes_label: 'Yes',

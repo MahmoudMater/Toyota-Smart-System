@@ -43,9 +43,15 @@
     riveSrc: "./avatar.riv",
   });
 
+  const beyRoom = window.TamkeenBey?.createBeyRoomController({
+    videoEl: $("beyVideo"),
+    statusEl: avatarStatus,
+  });
+
   let sessionId = null;
   let sessionLang = "en";
   let sessionState = "idle";
+  let avatarAdapter = "canvas";
   let mediaRecorder = null;
   let sttChunks = [];
   let answerRecorder = null;
@@ -100,6 +106,25 @@
     keypad.appendChild(b);
   });
 
+  async function ensureBeyRoom(data) {
+    if (!beyRoom || data.avatar_adapter !== "bey" || !data.livekit?.token) {
+      return false;
+    }
+    try {
+      $("avatarCanvas")?.classList.add("hidden");
+      $("riveCanvas")?.classList.add("hidden");
+      beyRoom.showBey(true);
+      await beyRoom.connect(data.livekit);
+      return true;
+    } catch (err) {
+      console.warn("LiveKit connect failed", err);
+      beyRoom.showBey(false);
+      $("avatarCanvas")?.classList.remove("hidden");
+      avatarStatus.textContent = `bey fallback: ${err.message || err}`;
+      return false;
+    }
+  }
+
   async function speakText(text, lang = sessionLang) {
     ttsStatus.textContent = `Synthesizing (${lang})…`;
     avatar.setState("talking");
@@ -129,6 +154,7 @@
     sessionId = data.session_id;
     sessionLang = data.lang || "en";
     sessionState = data.state;
+    avatarAdapter = data.avatar_adapter || "canvas";
     promptText.textContent = data.prompt || "";
     document.body.classList.remove("rtl");
     document.documentElement.lang = "en";
@@ -141,6 +167,8 @@
         retries: data.retries,
         gate_open_stub: data.gate_open_stub,
         visit_phone: data.visit_phone,
+        avatar_adapter: avatarAdapter,
+        livekit_room: data.livekit?.room || null,
       },
       null,
       2
@@ -172,23 +200,32 @@
     const needPhone = data.state === "awaiting_phone_speech";
     keypadSection.classList.toggle("hidden", !needPhone);
 
-    if (data.avatar_state) {
-      avatar.setState(data.avatar_state);
-    } else if (needPhone) {
-      avatar.setState("listening");
-    } else if (
-      data.state === "done" ||
-      data.state === "staff_escalation" ||
-      data.state === "not_recognized"
-    ) {
-      avatar.setState("idle");
+    if (avatarAdapter !== "bey") {
+      if (data.avatar_state) {
+        avatar.setState(data.avatar_state);
+      } else if (needPhone) {
+        avatar.setState("listening");
+      } else if (
+        data.state === "done" ||
+        data.state === "staff_escalation" ||
+        data.state === "not_recognized"
+      ) {
+        avatar.setState("idle");
+      }
     }
   }
 
   async function applyPromptSpeech(data) {
     if (!data?.prompt) return;
+    const beyOk =
+      data.avatar_adapter === "bey" ? await ensureBeyRoom(data) : false;
     try {
-      await speakText(data.speech || data.prompt, promptTtsLang(data));
+      if (beyOk) {
+        ttsStatus.textContent = "bey speaking (LiveKit)…";
+        await new Promise((r) => setTimeout(r, 800));
+      } else {
+        await speakText(data.speech || data.prompt, promptTtsLang(data));
+      }
     } catch (err) {
       console.warn("Prompt TTS failed", err);
       ttsStatus.textContent = `TTS error: ${err.message || err}`;
@@ -200,10 +237,12 @@
       "awaiting_phone_speech",
       "awaiting_phone_confirm",
     ];
-    if (listeningStates.includes(data.state)) {
-      avatar.setState("listening");
-    } else {
-      avatar.setState(data.avatar_state || "idle");
+    if (!beyOk) {
+      if (listeningStates.includes(data.state)) {
+        avatar.setState("listening");
+      } else {
+        avatar.setState(data.avatar_state || "idle");
+      }
     }
   }
 

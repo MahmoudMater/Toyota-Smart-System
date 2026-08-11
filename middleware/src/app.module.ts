@@ -18,6 +18,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { TtsModule } from './modules/tts/tts.module';
 import { SttModule } from './modules/stt/stt.module';
+import { LiveKitModule } from './modules/livekit/livekit.module';
 import { HealthController } from './health.controller';
 import { Env } from './config/env.validation';
 
@@ -45,19 +46,22 @@ import { Env } from './config/env.validation';
       ignoreErrors: false,
     }),
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
+      // nest-cli emits to dist/src/, so __dirname/../public is wrong; cwd is middleware/
+      rootPath: join(process.cwd(), 'public'),
+      // path-to-regexp v8 (Nest 11 / Express 5): named wildcards only — not `(.*)`
       exclude: [
-        '/health(.*)',
-        '/session(.*)',
-        '/queue(.*)',
-        '/slots(.*)',
-        '/lpr(.*)',
-        '/demo(.*)',
-        '/audit(.*)',
-        '/notifications(.*)',
-        '/tts(.*)',
-        '/stt(.*)',
-        '/socket.io(.*)',
+        '/health/{*any}',
+        '/session/{*any}',
+        '/queue/{*any}',
+        '/slots/{*any}',
+        '/lpr/{*any}',
+        '/demo/{*any}',
+        '/audit/{*any}',
+        '/notifications/{*any}',
+        '/tts/{*any}',
+        '/stt/{*any}',
+        '/avatar/{*any}',
+        '/socket.io/{*any}',
       ],
     }),
     CommonModule,
@@ -66,6 +70,7 @@ import { Env } from './config/env.validation';
     LprModule,
     SapModule,
     GateModule,
+    LiveKitModule,
     KioskModule,
     QueueEngineModule,
     NotificationsModule,

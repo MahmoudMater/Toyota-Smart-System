@@ -19,7 +19,9 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prove": "bash scripts/prove_flow.sh",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "avatar-agent": "npm --prefix avatar-agent run start",
+    "avatar-agent:dev": "npm --prefix avatar-agent run dev"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.5",
@@ -35,6 +37,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "ioredis": "^5.11.1",
+    "livekit-server-sdk": "^2.17.0",
     "nestjs-pino": "^4.6.1",
     "pino-http": "^10.5.0",
     "pino-pretty": "^13.1.3",

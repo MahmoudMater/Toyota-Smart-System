@@ -13,6 +13,7 @@ import type {
   SapLookupNotFoundPayload,
 } from '../../events/domain-events';
 import { LprService } from '../lpr/lpr.service';
+import { LiveKitService } from '../livekit/livekit.service';
 import { KioskGateway } from './kiosk.gateway';
 import { SessionStore } from './session.store';
 import {
@@ -21,7 +22,7 @@ import {
   handleInput,
   toPublic,
 } from './state-machine';
-import type { PublicSession, SessionInput } from './state-machine';
+import type { KioskSession, PublicSession, SessionInput } from './state-machine';
 
 @Injectable()
 export class KioskService {
@@ -31,9 +32,49 @@ export class KioskService {
     @Inject(forwardRef(() => KioskGateway))
     private readonly gateway: KioskGateway,
     private readonly lpr: LprService,
+    private readonly livekit: LiveKitService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(KioskService.name);
+  }
+
+  private async enrichPublic(session: KioskSession): Promise<PublicSession> {
+    if (!this.livekit.isBeyEnabled()) {
+      return toPublic(session, { avatar_adapter: 'canvas' });
+    }
+    try {
+      const join = await this.livekit.ensureRoomAndAgent({
+        gateId: session.gateId,
+        sessionId: session.sessionId,
+      });
+      if (join) {
+        return toPublic(session, {
+          avatar_adapter: 'bey',
+          livekit: {
+            url: join.url,
+            token: join.token,
+            room: join.room,
+          },
+        });
+      }
+    } catch (err) {
+      this.logger.warn({ err }, 'kiosk.livekit.enrich.failed');
+    }
+    return toPublic(session, { avatar_adapter: 'canvas' });
+  }
+
+  private async pushAndSpeak(session: KioskSession): Promise<PublicSession> {
+    const pub = await this.enrichPublic(session);
+    this.gateway.pushSession(session.gateId, pub);
+    if (pub.avatar_adapter === 'bey' && session.lastPromptSpeech) {
+      void this.livekit.speak({
+        gateId: session.gateId,
+        sessionId: session.sessionId,
+        text: session.lastPromptSpeech,
+        lang: session.lang,
+      });
+    }
+    return pub;
   }
 
   @OnEvent(DomainEvents.SapLookupFound)
@@ -44,7 +85,11 @@ export class KioskService {
       profile: payload.profile,
     });
     await this.store.save(session);
-    await this.lpr.markActive(payload.plateNumber, payload.gateId, 'kiosk_session');
+    await this.lpr.markActive(
+      payload.plateNumber,
+      payload.gateId,
+      'kiosk_session',
+    );
 
     const started: KioskSessionStartedPayload = {
       sessionId: session.sessionId,
@@ -55,8 +100,7 @@ export class KioskService {
     };
     this.events.emit(DomainEvents.KioskSessionStarted, started);
 
-    const pub = toPublic(session);
-    this.gateway.pushSession(session.gateId, pub);
+    await this.pushAndSpeak(session);
     this.logger.info(
       { sessionId: session.sessionId, gateId: session.gateId },
       'kiosk.session.started',
@@ -72,8 +116,7 @@ export class KioskService {
     });
     await this.store.save(session);
     await this.lpr.clearActive(payload.plateNumber);
-    const pub = toPublic(session);
-    this.gateway.pushSession(session.gateId, pub);
+    await this.pushAndSpeak(session);
     this.logger.info(
       { gateId: payload.gateId, plate: payload.plateNumber },
       'kiosk.not_recognized',
@@ -82,7 +125,7 @@ export class KioskService {
 
   async getSession(sessionId: string): Promise<PublicSession | null> {
     const session = await this.store.get(sessionId);
-    return session ? toPublic(session) : null;
+    return session ? this.enrichPublic(session) : null;
   }
 
   async handleSessionInput(
@@ -95,8 +138,7 @@ export class KioskService {
 
     const outcome = handleInput(session, input);
     await this.store.save(outcome.session);
-    const pub = toPublic(outcome.session);
-    this.gateway.pushSession(outcome.session.gateId, pub);
+    const pub = await this.pushAndSpeak(outcome.session);
 
     if (outcome.kind === 'completed') {
       const base = {
@@ -148,6 +190,6 @@ export class KioskService {
     if (!active) {
       throw new Error('Failed to create session');
     }
-    return toPublic(active);
+    return this.enrichPublic(active);
   }
 }

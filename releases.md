@@ -1,5 +1,68 @@
 # Releases
 
+## [2026-08-11 16:34] Fix avatar-agent ElevenLabs WS 403 (eleven_v3)
+
+**By:** @MahmoudMater
+
+**Requested:** Avatar-agent fails TTS with `could not connect to ElevenLabs` / WebSocket 403.
+
+**Changes:**
+- Confirmed HTTP `/tts` with `eleven_v3` works; LiveKit plugin WS `multi-stream-input` returns 403 for `eleven_v3` only
+- Avatar-agent now uses `ELEVENLABS_AVATAR_TTS_MODEL_ID` (default `eleven_flash_v2_5`) and falls back if `eleven_v3` is set
+- Strips v3 audio tags before `session.say`; documented in `.env.example` + README
+
+**Notes:** Nest can keep `ELEVENLABS_TTS_MODEL_ID=eleven_v3`. Restart `npm run avatar-agent:dev` after the change.
+
+## [2026-08-11 16:32] Fix false “livekit disconnected” status
+
+**By:** @MahmoudMater
+
+**Requested:** Why does the console show “livekit disconnected”?
+
+**Changes:**
+- Explained: LiveKit Cloud still had rooms with `bey-avatar-agent` + video/audio tracks; the UI label was wrong
+- Hardened `middleware/public/bey-room.js` so intentional reconnects / superseded rooms no longer overwrite status or clear the new video
+
+**Notes:** Hard-refresh console.html after pull. Disconnect reason is shown if the server really drops the browser.
+
+## [2026-08-11 16:27] Fix ServeStatic exclude + public path (console 500)
+
+**By:** @MahmoudMater
+
+**Requested:** console.html / favicon returning 500 (`pathToRegexpError` on `/health(.*)`).
+
+**Changes:**
+- Updated `ServeStaticModule` excludes to path-to-regexp v8 syntax (`/health/{*any}`, etc.) in `middleware/src/app.module.ts`
+- Pointed static `rootPath` at `join(process.cwd(), 'public')` (nest emits to `dist/src/`)
+- Added `middleware/public/favicon.ico` so browser icon requests stop 500-ing
+
+**Notes:** Verified `/console.html` and `/favicon.ico` return 200; `/health` shows `bey_enabled: true`.
+
+## [2026-08-11 16:23] Enable BEY avatar with LiveKit Cloud keys
+
+**By:** @MahmoudMater
+
+**Requested:** Paste LiveKit URL/key/secret and enable Beyond Presence.
+
+**Changes:**
+- Set `AVATAR_ADAPTER=bey` and LiveKit credentials in `middleware/.env`
+- Started Nest + `avatar-agent` worker; agent registered as `tamkeen-avatar` on LiveKit Cloud (EU West)
+
+**Notes:** Secrets live only in `.env` (not committed). Rotate if this chat is shared.
+
+## [2026-08-11 16:18] Beyond Presence speech-to-video via LiveKit
+
+**By:** @MahmoudMater
+
+**Requested:** Integrate Beyond Presence avatars with Speech-to-video + LiveKit (keep ElevenLabs, replace only the face).
+
+**Changes:**
+- Env: `AVATAR_ADAPTER`, `LIVEKIT_*`, `BEY_*` in `env.validation.ts` / `.env.example`; Nest `LiveKitModule` (room, agent dispatch, `kiosk.speak`, `/avatar/*`)
+- New `middleware/avatar-agent` worker (`@livekit/agents` + bey + elevenlabs); speaker-only on data packets; default Nelly avatar
+- Console/kiosk UI: LiveKit video mount + canvas fallback; README runbook
+
+**Notes:** Leave `AVATAR_ADAPTER=canvas` until LiveKit Cloud + BEY API keys are set, then `npm run avatar-agent:dev` alongside Nest.
+
 ## [2026-08-11 15:46] Retry ElevenLabs 429 system_busy
 
 **By:** @MahmoudMater

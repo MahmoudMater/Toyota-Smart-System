@@ -29,6 +29,18 @@ export const envSchema = z.object({
     .string()
     .default('http://localhost:3000,http://127.0.0.1:3000'),
 
+  // Avatar: canvas (local lip-sync) | bey (Beyond Presence via LiveKit)
+  AVATAR_ADAPTER: z.enum(['canvas', 'bey']).default('canvas'),
+  LIVEKIT_URL: z.string().optional().default(''),
+  LIVEKIT_API_KEY: z.string().optional().default(''),
+  LIVEKIT_API_SECRET: z.string().optional().default(''),
+  BEY_API_KEY: z.string().optional().default(''),
+  // Stock Nelly — https://docs.bey.dev/concepts/avatars/stock
+  BEY_AVATAR_ID: z
+    .string()
+    .default('694c83e2-8895-4a98-bd16-56332ca3f449'),
+  LIVEKIT_AGENT_NAME: z.string().default('tamkeen-avatar'),
+
   // NLU (transcript interpretation)
   NLU_ADAPTER: z.enum(['rules', 'llm']).default('rules'),
   NLU_BASE_URL: z.string().default('http://127.0.0.1:11434/v1'),
