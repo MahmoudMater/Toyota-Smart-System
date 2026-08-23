@@ -18,8 +18,7 @@ export const DomainEvents = {
   QueueAssigned: 'queue.assigned',
 } as const;
 
-export type DomainEventName =
-  (typeof DomainEvents)[keyof typeof DomainEvents];
+export type DomainEventName = (typeof DomainEvents)[keyof typeof DomainEvents];
 
 /* ─── Shared base ─── */
 

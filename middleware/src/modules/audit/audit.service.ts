@@ -60,7 +60,9 @@ export class AuditService implements OnModuleInit {
     return 0;
   }
 
-  async recent(count = 50): Promise<
+  async recent(
+    count = 50,
+  ): Promise<
     Array<{ id: string; event: string; payload: unknown; at: string }>
   > {
     const rows = await this.redis.xrevrange(

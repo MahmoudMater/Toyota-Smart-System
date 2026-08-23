@@ -19,9 +19,7 @@ export const gateRoom = (gateId: string) => `gate:${gateId}`;
   cors: { origin: true },
   namespace: '/kiosk',
 })
-export class KioskGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
-{
+export class KioskGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
 

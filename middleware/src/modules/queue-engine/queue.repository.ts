@@ -199,7 +199,10 @@ export class QueueRepository {
     return claims;
   }
 
-  async setActiveClaim(claim: ActiveClaim | null, slotId?: string): Promise<void> {
+  async setActiveClaim(
+    claim: ActiveClaim | null,
+    slotId?: string,
+  ): Promise<void> {
     if (!claim) {
       const sid = slotId;
       if (!sid) return;
@@ -282,7 +285,13 @@ export class QueueRepository {
     let deleted = 0;
     let cursor = '0';
     do {
-      const [next, keys] = await this.redis.scan(cursor, 'MATCH', 'qms:*', 'COUNT', 100);
+      const [next, keys] = await this.redis.scan(
+        cursor,
+        'MATCH',
+        'qms:*',
+        'COUNT',
+        100,
+      );
       cursor = next;
       if (keys.length) deleted += await this.redis.del(...keys);
     } while (cursor !== '0');
@@ -294,7 +303,11 @@ export class QueueRepository {
   async shiftBack(
     entryId: string,
     shiftDistance: number,
-  ): Promise<{ entry: QueueEntry; newPosition: number; slotId: string | null } | null> {
+  ): Promise<{
+    entry: QueueEntry;
+    newPosition: number;
+    slotId: string | null;
+  } | null> {
     const entry = await this.getEntry(entryId);
     if (!entry) return null;
     const slotId = entry.slotId;

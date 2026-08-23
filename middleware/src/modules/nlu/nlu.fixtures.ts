@@ -44,7 +44,8 @@ export const NLU_FIXTURES: NluFixture[] = [
   // ── Filler words ──────────────────────────────────────────────────
   {
     id: 'filler-01',
-    input: 'ummm my phone number is zero one zero one two three four five six seven eight',
+    input:
+      'ummm my phone number is zero one zero one two three four five six seven eight',
     expected: { normalized: 'digits', digits: '01012345678' },
     tags: ['filler', 'eg'],
   },
@@ -56,7 +57,8 @@ export const NLU_FIXTURES: NluFixture[] = [
   },
   {
     id: 'filler-03',
-    input: 'uh let me think zero one one two three uh four five six seven eight nine',
+    input:
+      'uh let me think zero one one two three uh four five six seven eight nine',
     expected: { normalized: 'digits', digits: '01123456789' },
     tags: ['filler', 'eg'],
   },
@@ -64,7 +66,8 @@ export const NLU_FIXTURES: NluFixture[] = [
   // ── Self-corrections ─────────────────────────────────────────────
   {
     id: 'correction-01',
-    input: 'ummm my phone number is zero one five five five zero three oh no no two nine nine',
+    input:
+      'ummm my phone number is zero one five five five zero three oh no no two nine nine',
     expected: { normalized: 'digits', digits: '01555032099' },
     tags: ['correction', 'eg', 'key-case'],
   },
@@ -76,13 +79,15 @@ export const NLU_FIXTURES: NluFixture[] = [
   },
   {
     id: 'correction-03',
-    input: 'zero one zero four wait no zero one zero five six seven eight nine zero one two',
+    input:
+      'zero one zero four wait no zero one zero five six seven eight nine zero one two',
     expected: { normalized: 'digits', digits: '01056789012' },
     tags: ['correction', 'eg'],
   },
   {
     id: 'correction-04',
-    input: 'its zero five three no I mean five four one two three four five six',
+    input:
+      'its zero five three no I mean five four one two three four five six',
     expected: { normalized: 'digits', digits: '0554123456' },
     tags: ['correction', 'sa'],
   },
@@ -102,7 +107,8 @@ export const NLU_FIXTURES: NluFixture[] = [
   },
   {
     id: 'oh-interjection-01',
-    input: 'oh the number is zero one zero one two three four five six seven eight',
+    input:
+      'oh the number is zero one zero one two three four five six seven eight',
     expected: { normalized: 'digits', digits: '01012345678' },
     tags: ['oh', 'eg'],
   },
@@ -168,7 +174,8 @@ export const NLU_FIXTURES: NluFixture[] = [
   },
   {
     id: 'ar-filler-01',
-    input: 'يعني الرقم صفر واحد صفر واحد اتنين تلاته اربعه خمسه سته سبعه تمانية',
+    input:
+      'يعني الرقم صفر واحد صفر واحد اتنين تلاته اربعه خمسه سته سبعه تمانية',
     expected: { normalized: 'digits', digits: '01012345678' },
     tags: ['arabic', 'filler', 'eg'],
   },
@@ -254,7 +261,8 @@ export const NLU_FIXTURES: NluFixture[] = [
   },
   {
     id: 'edge-with-noise',
-    input: 'my number is umm well its zero five zero one two three four five six seven',
+    input:
+      'my number is umm well its zero five zero one two three four five six seven',
     expected: { normalized: 'digits', digits: '0501234567' },
     tags: ['filler', 'sa'],
   },

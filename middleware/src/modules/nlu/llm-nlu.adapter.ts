@@ -3,7 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import type { Env } from '../../config/env.validation';
 import { normalizeTranscript } from '../../common/normalize';
-import type { TranscriptInterpreter, NluInterpretResult } from './transcript.interpreter';
+import { IntegrationLogService } from '../integration-log/integration-log.service';
+import type {
+  TranscriptInterpreter,
+  NluInterpretResult,
+} from './transcript.interpreter';
 import { NLU_SYSTEM_PROMPT, NLU_FEW_SHOT, NLU_JSON_SCHEMA } from './prompt';
 
 interface LlmResponse {
@@ -23,6 +27,7 @@ export class LlmNluAdapter implements TranscriptInterpreter {
   constructor(
     private readonly config: ConfigService<Env, true>,
     private readonly logger: PinoLogger,
+    private readonly integrationLog: IntegrationLogService,
   ) {
     this.logger.setContext(LlmNluAdapter.name);
     this.baseUrl = this.config.get('NLU_BASE_URL', { infer: true });
@@ -54,31 +59,71 @@ export class LlmNluAdapter implements TranscriptInterpreter {
     ];
 
     const url = `${root}/api/chat`;
-    this.logger.debug({ url, model: this.model }, 'nlu.llm.ollama_native');
-
-    const res = await globalThis.fetch(url, {
+    const call = this.integrationLog.startCall({
+      integration: 'nlu',
+      op: 'nlu.llm.ollama_native',
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: this.model,
-        messages,
-        stream: false,
-        think: false,
-        format: 'json',
-        options: { temperature: 0, num_predict: 48 },
-      }),
-      signal: AbortSignal.timeout(this.timeoutMs),
+      url,
+      request: { model: this.model, text, timeoutMs: this.timeoutMs },
     });
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`LLM API ${res.status}: ${errText.slice(0, 200)}`);
-    }
+    try {
+      const res = await globalThis.fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.model,
+          messages,
+          stream: false,
+          think: false,
+          format: 'json',
+          options: { temperature: 0, num_predict: 48 },
+        }),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
 
-    const json = (await res.json()) as { message?: { content?: string } };
-    const content = json.message?.content;
-    if (!content) throw new Error('LLM returned empty content');
-    return this.toNluResult(text, this.parseResponse(content));
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        call.failure({
+          status: res.status,
+          error: `LLM API ${res.status}`,
+          body: errText.slice(0, 200),
+        });
+        throw new Error(`LLM API ${res.status}: ${errText.slice(0, 200)}`);
+      }
+
+      const json = (await res.json()) as { message?: { content?: string } };
+      const content = json.message?.content;
+      if (!content) {
+        call.failure({
+          status: res.status,
+          error: 'LLM returned empty content',
+        });
+        throw new Error('LLM returned empty content');
+      }
+      const result = this.toNluResult(text, this.parseResponse(content));
+      call.success({
+        status: res.status,
+        response: {
+          raw: content,
+          intent: result.normalized,
+          digits: result.digits,
+        },
+      });
+      return result;
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('LLM API')) throw err;
+      if (
+        err instanceof Error &&
+        err.message === 'LLM returned empty content'
+      ) {
+        throw err;
+      }
+      call.failure({
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
   }
 
   private async interpretViaOpenAiCompat(
@@ -118,26 +163,66 @@ export class LlmNluAdapter implements TranscriptInterpreter {
     }
 
     const url = `${base}/chat/completions`;
-    this.logger.debug({ url, model: this.model }, 'nlu.llm.openai_compat');
-
-    const res = await globalThis.fetch(url, {
+    const call = this.integrationLog.startCall({
+      integration: 'nlu',
+      op: 'nlu.llm.openai_compat',
       method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(this.timeoutMs),
+      url,
+      request: { model: this.model, text, timeoutMs: this.timeoutMs },
     });
 
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`LLM API ${res.status}: ${errText.slice(0, 200)}`);
-    }
+    try {
+      const res = await globalThis.fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(this.timeoutMs),
+      });
 
-    const json = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = json.choices?.[0]?.message?.content;
-    if (!content) throw new Error('LLM returned empty content');
-    return this.toNluResult(text, this.parseResponse(content));
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        call.failure({
+          status: res.status,
+          error: `LLM API ${res.status}`,
+          body: errText.slice(0, 200),
+        });
+        throw new Error(`LLM API ${res.status}: ${errText.slice(0, 200)}`);
+      }
+
+      const json = (await res.json()) as {
+        choices?: { message?: { content?: string } }[];
+      };
+      const content = json.choices?.[0]?.message?.content;
+      if (!content) {
+        call.failure({
+          status: res.status,
+          error: 'LLM returned empty content',
+        });
+        throw new Error('LLM returned empty content');
+      }
+      const result = this.toNluResult(text, this.parseResponse(content));
+      call.success({
+        status: res.status,
+        response: {
+          raw: content,
+          intent: result.normalized,
+          digits: result.digits,
+        },
+      });
+      return result;
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('LLM API')) throw err;
+      if (
+        err instanceof Error &&
+        err.message === 'LLM returned empty content'
+      ) {
+        throw err;
+      }
+      call.failure({
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
   }
 
   private parseResponse(content: string): LlmResponse {
@@ -162,18 +247,25 @@ export class LlmNluAdapter implements TranscriptInterpreter {
     }
 
     return {
-      intent: intent as LlmResponse['intent'],
+      intent: intent,
       digits: typeof digits === 'string' ? digits.replace(/\D/g, '') : null,
     };
   }
 
-  private toNluResult(originalText: string, parsed: LlmResponse): NluInterpretResult {
+  private toNluResult(
+    originalText: string,
+    parsed: LlmResponse,
+  ): NluInterpretResult {
     if (parsed.intent === 'yes' || parsed.intent === 'no') {
       return { text: originalText, normalized: parsed.intent, digits: null };
     }
 
     if (parsed.intent === 'digits' && parsed.digits) {
-      return { text: originalText, normalized: 'digits', digits: parsed.digits };
+      return {
+        text: originalText,
+        normalized: 'digits',
+        digits: parsed.digits,
+      };
     }
 
     // LLM returned null or digits without actual digits — fall back to rules

@@ -5,6 +5,7 @@ import Redis from 'ioredis';
 import { PinoLogger } from 'nestjs-pino';
 import type { Env } from '../../config/env.validation';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
+import { IntegrationLogService } from '../integration-log/integration-log.service';
 import type { SpeechSynthesizer, SynthesizeResult } from './speech.synthesizer';
 import { SPEECH_SYNTHESIZER } from './speech.synthesizer';
 
@@ -17,6 +18,7 @@ export class TtsService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly config: ConfigService<Env, true>,
     private readonly logger: PinoLogger,
+    private readonly integrationLog: IntegrationLogService,
   ) {
     this.logger.setContext(TtsService.name);
   }
@@ -41,10 +43,7 @@ export class TtsService {
     return this.config.get('TTS_CACHE_TTL_SECONDS', { infer: true });
   }
 
-  async synthesize(
-    text: string,
-    lang: string,
-  ): Promise<SynthesizeResult> {
+  async synthesize(text: string, lang: string): Promise<SynthesizeResult> {
     if (!text || !text.trim()) {
       throw new Error('text must be non-empty');
     }
@@ -53,43 +52,32 @@ export class TtsService {
 
     const cached = await this.redis.getBuffer(key);
     if (cached) {
-      this.logger.info(
-        {
-          adapter: this.synthesizer.adapterName,
-          lang,
-          chars: trimmed.length,
-          bytes: cached.length,
-        },
-        'tts.cache.hit',
-      );
-      const format = this.config.get('ELEVENLABS_TTS_OUTPUT_FORMAT', {
-        infer: true,
-      });
-      const contentType = format.startsWith('wav')
-        ? 'audio/wav'
-        : 'audio/mpeg';
-      return { audio: cached, contentType };
-    }
-
-    this.logger.info(
-      {
+      this.integrationLog.event('tts', 'tts.cache.hit', {
         adapter: this.synthesizer.adapterName,
         lang,
         chars: trimmed.length,
-        preview: trimmed.slice(0, 80),
-      },
-      'tts.synthesize.start',
-    );
+        bytes: cached.length,
+      });
+      const format = this.config.get('ELEVENLABS_TTS_OUTPUT_FORMAT', {
+        infer: true,
+      });
+      const contentType = format.startsWith('wav') ? 'audio/wav' : 'audio/mpeg';
+      return { audio: cached, contentType };
+    }
+
+    this.integrationLog.event('tts', 'tts.synthesize.start', {
+      adapter: this.synthesizer.adapterName,
+      lang,
+      chars: trimmed.length,
+      text: trimmed,
+    });
     const result = await this.synthesizer.synthesize(trimmed, lang);
     await this.redis.set(key, result.audio, 'EX', this.cacheTtl());
-    this.logger.info(
-      {
-        adapter: this.synthesizer.adapterName,
-        bytes: result.audio.length,
-        contentType: result.contentType,
-      },
-      'tts.synthesize.done',
-    );
+    this.integrationLog.event('tts', 'tts.synthesize.done', {
+      adapter: this.synthesizer.adapterName,
+      bytes: result.audio.length,
+      contentType: result.contentType,
+    });
     return result;
   }
 

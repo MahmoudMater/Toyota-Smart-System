@@ -1,7 +1,4 @@
-import {
-  applyShiftBack,
-  nextShiftDistance,
-} from './queue.logic';
+import { applyShiftBack, nextShiftDistance } from './queue.logic';
 
 describe('queue.logic shift-back', () => {
   it('pushes first miss back 1 position', () => {

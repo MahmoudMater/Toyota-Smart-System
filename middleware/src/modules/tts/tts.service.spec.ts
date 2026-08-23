@@ -60,17 +60,36 @@ function fakeLogger() {
   return { setContext: jest.fn(), debug: jest.fn(), info: jest.fn() } as any;
 }
 
+function fakeIntegrationLog() {
+  return {
+    event: jest.fn(),
+    startCall: jest.fn(() => ({
+      success: jest.fn(),
+      failure: jest.fn(),
+      retry: jest.fn(),
+    })),
+  } as any;
+}
+
 function createService() {
   const synth = new FakeSynthesizer();
   const redis = new FakeRedis();
-  const service = new TtsService(synth, redis as any, fakeConfig(), fakeLogger());
+  const service = new TtsService(
+    synth,
+    redis as any,
+    fakeConfig(),
+    fakeLogger(),
+    fakeIntegrationLog(),
+  );
   return { service, synth, redis };
 }
 
 describe('TtsService', () => {
   it('rejects empty text', async () => {
     const { service } = createService();
-    await expect(service.synthesize('', 'en')).rejects.toThrow('text must be non-empty');
+    await expect(service.synthesize('', 'en')).rejects.toThrow(
+      'text must be non-empty',
+    );
   });
 
   it('calls synthesizer on cache miss', async () => {

@@ -1,8 +1,4 @@
-import {
-  createSession,
-  handleInput,
-  KioskState,
-} from './state-machine';
+import { createSession, handleInput, KioskState } from './state-machine';
 
 const profile = {
   name: 'Ahmed Hassan',

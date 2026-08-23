@@ -2,6 +2,7 @@ import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import type { Env } from '../../config/env.validation';
+import { IntegrationLogService } from '../integration-log/integration-log.service';
 
 export const ELEVENLABS_CLIENT = Symbol('ELEVENLABS_CLIENT');
 
@@ -11,6 +12,10 @@ export interface ElevenLabsRequestOptions {
   body?: BodyInit | null;
   headers?: Record<string, string>;
   contentType?: string;
+  /** High-level op name for integration logs (e.g. tts.synthesize). */
+  op?: string;
+  /** Structured request metadata (text preview, voice, etc.). */
+  meta?: Record<string, unknown>;
 }
 
 const MAX_ATTEMPTS = 4;
@@ -36,6 +41,7 @@ export class ElevenLabsClient {
   constructor(
     private readonly config: ConfigService<Env, true>,
     private readonly logger: PinoLogger,
+    private readonly integrationLog: IntegrationLogService,
   ) {
     this.logger.setContext(ElevenLabsClient.name);
     this.apiKey = this.config.get('ELEVENLABS_API_KEY', { infer: true });
@@ -64,10 +70,17 @@ export class ElevenLabsClient {
 
     let lastErrorText = '';
     let lastStatus = 0;
+    const op = options.op ?? 'elevenlabs.fetch';
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const started = Date.now();
-      this.logger.info({ url, method, attempt }, 'elevenlabs.request');
+      const call = this.integrationLog.startCall({
+        integration: 'elevenlabs',
+        op,
+        method,
+        url,
+        attempt,
+        request: options.meta,
+      });
 
       const res = await globalThis.fetch(url, {
         method,
@@ -76,16 +89,7 @@ export class ElevenLabsClient {
       });
 
       if (res.ok) {
-        this.logger.info(
-          {
-            url,
-            method,
-            status: res.status,
-            attempt,
-            durationMs: Date.now() - started,
-          },
-          'elevenlabs.response',
-        );
+        call.success({ status: res.status });
         return res;
       }
 
@@ -95,26 +99,19 @@ export class ElevenLabsClient {
       const retryable =
         attempt < MAX_ATTEMPTS && isRetryableBody(res.status, text);
 
-      this.logger.error(
-        {
-          status: res.status,
-          url,
-          attempt,
-          retryable,
-          durationMs: Date.now() - started,
-          body: text.slice(0, 500),
-        },
-        'elevenlabs.error',
-      );
+      call.failure({
+        status: res.status,
+        error: `HTTP ${res.status}`,
+        body: text.slice(0, 500),
+      });
 
       if (!retryable) break;
 
       // 429 system_busy: back off ~0.8s, 1.6s, 3.2s (+ jitter)
-      const delayMs = Math.round(800 * 2 ** (attempt - 1) + Math.random() * 200);
-      this.logger.warn(
-        { attempt, delayMs, status: res.status },
-        'elevenlabs.retry',
+      const delayMs = Math.round(
+        800 * 2 ** (attempt - 1) + Math.random() * 200,
       );
+      call.retry({ attempt, delayMs, status: res.status });
       await sleep(delayMs);
     }
 

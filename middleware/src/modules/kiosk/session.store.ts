@@ -37,7 +37,13 @@ export class SessionStore {
     let deleted = 0;
     let cursor = '0';
     do {
-      const [next, keys] = await this.redis.scan(cursor, 'MATCH', 'kiosk:*', 'COUNT', 100);
+      const [next, keys] = await this.redis.scan(
+        cursor,
+        'MATCH',
+        'kiosk:*',
+        'COUNT',
+        100,
+      );
       cursor = next;
       if (keys.length) deleted += await this.redis.del(...keys);
     } while (cursor !== '0');

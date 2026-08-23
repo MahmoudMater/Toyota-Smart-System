@@ -4,12 +4,14 @@ import { PinoLogger } from 'nestjs-pino';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
 import { DomainEventBus } from '../../events/domain-event-bus';
 import { DomainEvents, LprPlateReadPayload } from '../../events/domain-events';
+import { IntegrationLogService } from '../integration-log/integration-log.service';
 import { PlateReadDto } from './dto/plate-read.dto';
 
 const ACTIVE_SESSION_KEY = (plate: string) =>
   `lpr:active:${plate.trim().toUpperCase().replace(/\s+/g, '')}`;
 
-export type PlateActiveReason = 'lpr_dedupe' | 'kiosk_session' | 'queue_enqueued';
+export type PlateActiveReason =
+  'lpr_dedupe' | 'kiosk_session' | 'queue_enqueued';
 
 const TTL_BY_REASON: Record<PlateActiveReason, number> = {
   lpr_dedupe: 120,
@@ -30,6 +32,7 @@ export class LprService {
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly events: DomainEventBus,
     private readonly logger: PinoLogger,
+    private readonly integrationLog: IntegrationLogService,
   ) {
     this.logger.setContext(LprService.name);
   }
@@ -44,9 +47,11 @@ export class LprService {
 
     const existing = await this.redis.get(key);
     if (existing) {
-      this.logger.info(
-        { plateNumber, gateId, existing },
+      this.integrationLog.event(
+        'lpr',
         'lpr.plate.deduped',
+        { plateNumber, gateId, existing },
+        correlationId,
       );
       return {
         accepted: false,
@@ -65,6 +70,17 @@ export class LprService {
       image: dto.image,
       correlationId,
     };
+    this.integrationLog.event(
+      'lpr',
+      'lpr.plate.accepted',
+      {
+        plateNumber,
+        gateId,
+        timestamp: payload.timestamp,
+        hasImage: Boolean(dto.image),
+      },
+      correlationId,
+    );
     this.events.emit(DomainEvents.LprPlateRead, payload);
     return { accepted: true, plateNumber, gateId };
   }
@@ -73,7 +89,13 @@ export class LprService {
     let deleted = 0;
     let cursor = '0';
     do {
-      const [next, keys] = await this.redis.scan(cursor, 'MATCH', 'lpr:active:*', 'COUNT', 100);
+      const [next, keys] = await this.redis.scan(
+        cursor,
+        'MATCH',
+        'lpr:active:*',
+        'COUNT',
+        100,
+      );
       cursor = next;
       if (keys.length) deleted += await this.redis.del(...keys);
     } while (cursor !== '0');

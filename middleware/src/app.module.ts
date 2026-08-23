@@ -18,6 +18,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { DemoModule } from './modules/demo/demo.module';
 import { TtsModule } from './modules/tts/tts.module';
 import { SttModule } from './modules/stt/stt.module';
+import { IntegrationLogModule } from './modules/integration-log/integration-log.module';
 import { HealthController } from './health.controller';
 import { Env } from './config/env.validation';
 
@@ -40,6 +41,7 @@ import { Env } from './config/env.validation';
         },
       }),
     }),
+    IntegrationLogModule,
     EventEmitterModule.forRoot({
       wildcard: false,
       ignoreErrors: false,

@@ -7,6 +7,7 @@ import type {
   QueueClaimConfirmedPayload,
   QueueNotifiedPayload,
 } from '../../events/domain-events';
+import { IntegrationLogService } from '../integration-log/integration-log.service';
 import { NOTIFICATION_SENDER } from './notification.sender';
 import type { NotificationSender } from './notification.sender';
 
@@ -16,6 +17,7 @@ export class NotificationsService {
     @Inject(NOTIFICATION_SENDER) private readonly sender: NotificationSender,
     private readonly events: DomainEventBus,
     private readonly logger: PinoLogger,
+    private readonly integrationLog: IntegrationLogService,
   ) {
     this.logger.setContext(NotificationsService.name);
   }
@@ -42,10 +44,21 @@ export class NotificationsService {
       entryId: params.entryId,
       plateNumber: params.plateNumber,
       slotId: params.slotId,
+
       confirmedAt: new Date().toISOString(),
       correlationId: params.correlationId,
     };
-    this.logger.info(payload, 'notification.whatsapp.confirmed');
+    this.integrationLog.event(
+      'notifications',
+      'notification.whatsapp.confirmed',
+      {
+        entryId: payload.entryId,
+        plateNumber: payload.plateNumber,
+        slotId: payload.slotId,
+        confirmedAt: payload.confirmedAt,
+      },
+      params.correlationId,
+    );
     this.events.emit(DomainEvents.QueueClaimConfirmed, payload);
   }
 }

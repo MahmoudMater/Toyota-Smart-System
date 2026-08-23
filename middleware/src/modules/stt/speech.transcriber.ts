@@ -5,6 +5,10 @@ export interface TranscribeResult {
 }
 
 export interface SpeechTranscriber {
-  transcribe(audioBuffer: Buffer, filename: string, lang?: string): Promise<TranscribeResult>;
+  transcribe(
+    audioBuffer: Buffer,
+    filename: string,
+    lang?: string,
+  ): Promise<TranscribeResult>;
   readonly adapterName: string;
 }

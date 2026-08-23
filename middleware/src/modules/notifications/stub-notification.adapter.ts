@@ -1,26 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger } from 'nestjs-pino';
-import {
-  NotificationSender,
-  NotifyRequest,
-} from './notification.sender';
+import { IntegrationLogService } from '../integration-log/integration-log.service';
+import { NotificationSender, NotifyRequest } from './notification.sender';
 
 @Injectable()
 export class StubNotificationAdapter implements NotificationSender {
-  constructor(private readonly logger: PinoLogger) {
+  constructor(
+    private readonly logger: PinoLogger,
+    private readonly integrationLog: IntegrationLogService,
+  ) {
     this.logger.setContext(StubNotificationAdapter.name);
   }
 
-  async notify(request: NotifyRequest): Promise<void> {
-    this.logger.info(
-      {
-        entryId: request.entryId,
-        phone: request.phone,
-        plate: request.plateNumber,
-        slotId: request.slotId,
-        channels: request.channels,
-      },
-      'notification.stub.send',
-    );
+  notify(request: NotifyRequest): Promise<void> {
+    this.integrationLog.event('notifications', 'notification.stub.send', {
+      entryId: request.entryId,
+      phone: request.phone,
+      plate: request.plateNumber,
+      slotId: request.slotId,
+      channels: request.channels,
+    });
+    return Promise.resolve();
   }
 }

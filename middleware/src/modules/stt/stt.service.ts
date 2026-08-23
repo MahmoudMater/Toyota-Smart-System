@@ -38,7 +38,11 @@ export class SttService {
     const result = await this.nlu.interpret(raw.text);
 
     this.logger.debug(
-      { text: result.text, normalized: result.normalized, nluAdapter: this.nlu.adapterName },
+      {
+        text: result.text,
+        normalized: result.normalized,
+        nluAdapter: this.nlu.adapterName,
+      },
       'stt.transcribed',
     );
     return result;

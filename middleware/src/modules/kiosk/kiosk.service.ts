@@ -44,7 +44,11 @@ export class KioskService {
       profile: payload.profile,
     });
     await this.store.save(session);
-    await this.lpr.markActive(payload.plateNumber, payload.gateId, 'kiosk_session');
+    await this.lpr.markActive(
+      payload.plateNumber,
+      payload.gateId,
+      'kiosk_session',
+    );
 
     const started: KioskSessionStartedPayload = {
       sessionId: session.sessionId,

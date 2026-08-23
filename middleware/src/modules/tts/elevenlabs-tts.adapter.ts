@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PinoLogger } from 'nestjs-pino';
 import type { Env } from '../../config/env.validation';
 import { ElevenLabsClient } from '../speech/elevenlabs.client';
+import { IntegrationLogService } from '../integration-log/integration-log.service';
 import type { SpeechSynthesizer, SynthesizeResult } from './speech.synthesizer';
 
 const FORMAT_TO_CONTENT_TYPE: Record<string, string> = {
@@ -34,6 +35,7 @@ export class ElevenLabsTtsAdapter implements SpeechSynthesizer {
     private readonly client: ElevenLabsClient,
     private readonly config: ConfigService<Env, true>,
     private readonly logger: PinoLogger,
+    private readonly integrationLog: IntegrationLogService,
   ) {
     this.logger.setContext(ElevenLabsTtsAdapter.name);
     this.voiceId = this.config.get('ELEVENLABS_TTS_VOICE_ID', { infer: true });
@@ -52,23 +54,29 @@ export class ElevenLabsTtsAdapter implements SpeechSynthesizer {
       body.language_code = lang;
     }
 
-    this.logger.info(
-      {
-        voiceId: this.voiceId,
-        modelId: this.modelId,
-        format: this.outputFormat,
-        lang,
-        chars: text.length,
-        preview: text.slice(0, 80),
-      },
-      'tts.elevenlabs.call',
-    );
+    this.integrationLog.event('elevenlabs', 'tts.elevenlabs.call', {
+      voiceId: this.voiceId,
+      modelId: this.modelId,
+      format: this.outputFormat,
+      lang,
+      chars: text.length,
+      text,
+    });
 
     const res = await this.client.fetch({
       path: `/v1/text-to-speech/${this.voiceId}?output_format=${this.outputFormat}`,
       method: 'POST',
       body: JSON.stringify(body),
       contentType: 'application/json',
+      op: 'tts.synthesize',
+      meta: {
+        voiceId: this.voiceId,
+        modelId: this.modelId,
+        format: this.outputFormat,
+        lang,
+        chars: text.length,
+        text,
+      },
     });
 
     const arrayBuffer = await res.arrayBuffer();
@@ -76,10 +84,12 @@ export class ElevenLabsTtsAdapter implements SpeechSynthesizer {
     const contentType =
       FORMAT_TO_CONTENT_TYPE[this.outputFormat] ?? 'audio/mpeg';
 
-    this.logger.info(
-      { bytes: audio.length, lang, format: this.outputFormat, contentType },
-      'tts.elevenlabs.synthesized',
-    );
+    this.integrationLog.event('elevenlabs', 'tts.elevenlabs.synthesized', {
+      bytes: audio.length,
+      lang,
+      format: this.outputFormat,
+      contentType,
+    });
 
     return { audio, contentType };
   }

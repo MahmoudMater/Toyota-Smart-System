@@ -72,8 +72,8 @@ function speakPhone(phone: string, lang = 'en'): string {
 export function greeting(lang: string, name: string, plate: string): Prompt {
   if (lang === 'en') {
     return {
-      display: `Al-Sayer Hayyak welcomes you. Hello ${name}. We found vehicle ${plate} on file.`,
-      speech: `[warmly] Al-Sayer Hayyak welcomes you. ... Hello ${name}. ... We found vehicle ${plate} on file.`,
+      display: `Al-Sayer Hayyak welcome. Hello ${name}. We found vehicle ${plate} on file.`,
+      speech: `[warmly] Al-Sayer Hayyak welcome. ... Hello ${name}. ... We found vehicle ${plate} on file.`,
     };
   }
   return {

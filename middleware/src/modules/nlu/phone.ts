@@ -22,7 +22,10 @@ function stripToDigits(input: string): string {
   return input.replace(/\D/g, '');
 }
 
-function stripCountryCode(digits: string): { stripped: string; hint: PhoneRegion | null } {
+function stripCountryCode(digits: string): {
+  stripped: string;
+  hint: PhoneRegion | null;
+} {
   // +20 / 0020 → Egypt
   if (digits.startsWith('20') && digits.length === 12) {
     return { stripped: '0' + digits.slice(2), hint: 'EG' };

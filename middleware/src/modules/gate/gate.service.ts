@@ -8,6 +8,7 @@ import type {
   KioskIdentityConfirmedPayload,
   KioskPhoneCapturedPayload,
 } from '../../events/domain-events';
+import { IntegrationLogService } from '../integration-log/integration-log.service';
 import { GATE_CONTROLLER } from './gate.controller.port';
 import type { GateControllerPort } from './gate.controller.port';
 
@@ -17,6 +18,7 @@ export class GateService {
     @Inject(GATE_CONTROLLER) private readonly gate: GateControllerPort,
     private readonly events: DomainEventBus,
     private readonly logger: PinoLogger,
+    private readonly integrationLog: IntegrationLogService,
   ) {
     this.logger.setContext(GateService.name);
   }
@@ -45,9 +47,15 @@ export class GateService {
     this.events.emit(DomainEvents.GateOpenCommanded, gatePayload);
     await this.gate.openGate(payload.gateId);
     this.events.emit(DomainEvents.GateOpened, gatePayload);
-    this.logger.info(
-      { gateId: payload.gateId, sessionId: payload.sessionId },
+    this.integrationLog.event(
+      'gate',
       'gate.opened',
+      {
+        gateId: payload.gateId,
+        sessionId: payload.sessionId,
+        plateNumber: payload.plateNumber,
+      },
+      payload.correlationId,
     );
   }
 }

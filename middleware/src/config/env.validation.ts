@@ -38,6 +38,16 @@ export const envSchema = z.object({
   // Fail fast to rules so the socket path never hangs.
   NLU_TIMEOUT_MS: z.coerce.number().default(2000),
   PHONE_REGIONS: z.string().default('EG,SA'),
+
+  // Integration file + live logs (ElevenLabs, LPR, NLU, SAP, …)
+  INTEGRATION_LOG_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  INTEGRATION_LOG_DIR: z.string().default('logs'),
+  INTEGRATION_LOG_MAX_BODY_CHARS: z.coerce.number().default(2000),
+  INTEGRATION_LOG_MAX_FILE_MB: z.coerce.number().default(10),
+  INTEGRATION_LOG_ROTATE_KEEP: z.coerce.number().default(3),
 });
 
 export type Env = z.infer<typeof envSchema>;

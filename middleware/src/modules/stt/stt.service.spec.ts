@@ -13,7 +13,12 @@ class FakeTranscriber implements SpeechTranscriber {
 }
 
 function fakeLogger() {
-  return { setContext: jest.fn(), debug: jest.fn(), info: jest.fn(), warn: jest.fn() } as any;
+  return {
+    setContext: jest.fn(),
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+  } as any;
 }
 
 function fakeNluService(): NluService {
@@ -52,7 +57,9 @@ describe('SttService', () => {
   });
 
   it('extracts digits from transcript', async () => {
-    const { service } = createService('zero five zero one two three four five six seven');
+    const { service } = createService(
+      'zero five zero one two three four five six seven',
+    );
     const result = await service.transcribe(Buffer.from('data'), 'clip.webm');
     expect(result.normalized).toBe('digits');
     expect(result.digits).toBe('0501234567');

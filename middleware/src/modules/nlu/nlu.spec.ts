@@ -97,37 +97,51 @@ describe('NluService latency fast-path', () => {
 describe('Phone validation', () => {
   it('accepts valid Egyptian numbers', () => {
     expect(validatePhone('01012345678', ['EG'])).toEqual({
-      valid: true, region: 'EG', local: '01012345678',
+      valid: true,
+      region: 'EG',
+      local: '01012345678',
     });
     expect(validatePhone('01512345678', ['EG'])).toEqual({
-      valid: true, region: 'EG', local: '01512345678',
+      valid: true,
+      region: 'EG',
+      local: '01512345678',
     });
   });
 
   it('accepts valid Saudi numbers', () => {
     expect(validatePhone('0501234567', ['SA'])).toEqual({
-      valid: true, region: 'SA', local: '0501234567',
+      valid: true,
+      region: 'SA',
+      local: '0501234567',
     });
     expect(validatePhone('0555123456', ['SA'])).toEqual({
-      valid: true, region: 'SA', local: '0555123456',
+      valid: true,
+      region: 'SA',
+      local: '0555123456',
     });
   });
 
   it('strips +20 country code', () => {
     expect(validatePhone('201012345678', ['EG'])).toEqual({
-      valid: true, region: 'EG', local: '01012345678',
+      valid: true,
+      region: 'EG',
+      local: '01012345678',
     });
   });
 
   it('strips +966 country code', () => {
     expect(validatePhone('966501234567', ['SA'])).toEqual({
-      valid: true, region: 'SA', local: '0501234567',
+      valid: true,
+      region: 'SA',
+      local: '0501234567',
     });
   });
 
   it('strips 00966 country code', () => {
     expect(validatePhone('00966501234567', ['SA'])).toEqual({
-      valid: true, region: 'SA', local: '0501234567',
+      valid: true,
+      region: 'SA',
+      local: '0501234567',
     });
   });
 

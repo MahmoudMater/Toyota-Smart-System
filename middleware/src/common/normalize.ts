@@ -79,8 +79,7 @@ const WORD_NUMBERS: Record<string, string> = {
   تسعه: '9',
 };
 
-const ARABIC_INDIC =
-  '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'.split('');
+const ARABIC_INDIC = '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹'.split('');
 const ASCII_DIGITS = '01234567890123456789'.split('');
 
 function fold(text: string): string {
