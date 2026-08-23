@@ -56,7 +56,7 @@ A **demo-ready NestJS middleware prototype** with:
 
 - Full kiosk session state machine (voice + touch)
 - Shared queue engine with BullMQ claim timers
-- Three browser UIs (kiosk, demo console, integration logs)
+- Three browser UIs in Next.js (`web/`) — kiosk, demo console, integration logs
 - ElevenLabs STT/TTS integration (live)
 - Stub adapters for SAP, gate, and WhatsApp so local development proceeds before vendor API schemas arrive
 - End-to-end proof script and unit tests
@@ -141,8 +141,8 @@ Work completed August 9–11, 2026 (see [`releases.md`](../../releases.md) for f
 ### F. Web UIs
 
 - **Kiosk** (`index.html`) — avatar, voice capture, touch keypad, STT/TTS sandbox
-- **Demo console** (`console.html`) — full operator workflow with audit timeline
-- **Integration logs** (`logs.html`) — live tail of external API calls
+- **Demo console** (`web/app/console`) — full operator workflow with audit timeline
+- **Integration logs** (`web/app/logs`) — live tail of external API calls
 
 ### G. Integration logging
 
@@ -242,40 +242,41 @@ Env vars: `STT_ADAPTER`, `TTS_ADAPTER`, `NLU_ADAPTER`.
 
 ## 6. Web UIs
 
-All UIs are **thin HTML/JavaScript clients** served from `middleware/public/` via NestJS `ServeStaticModule`. **All session logic lives on the server** — the browser handles presentation, TTS playback, STT capture, and Socket.io transport only.
+All UIs are **thin Next.js/React clients** in [`web/`](../../web/) (port **3001**). They call the NestJS middleware API (port **3000**) for REST and Socket.io. **All session logic lives on the server** — the browser handles presentation, TTS playback, STT capture, and Socket.io transport only.
+
+Run the web app: `cd web && npm run dev` → http://127.0.0.1:3001
 
 ### 6.1 Regular kiosk UI
 
-| File | Role |
+| Path | Role |
 |------|------|
-| `index.html` | Kiosk layout — avatar panel, session controls, STT/TTS sandboxes |
-| `app.js` | Socket.io connect, session render, hold-to-speak, touch input |
-| `avatar.js` | Avatar states (idle/talking/listening), canvas or Rive lip-sync from TTS audio RMS |
+| `app/page.tsx` + `features/kiosk/KioskApp.tsx` | Kiosk layout — avatar, session, STT/TTS sandboxes |
+| `components/avatar/KioskAvatar.tsx` | Avatar states (idle/talking/listening), canvas lip-sync from TTS audio RMS |
+| `lib/mw-api.ts` | HTTP + Socket.io wrapper to middleware |
 
-**URL:** http://127.0.0.1:3000/
+**URL:** http://127.0.0.1:3001/
 
 Features: Start manual visit, Yes/No buttons, hold-to-record voice answers, phone keypad, TTS/STT test panels.
 
 ### 6.2 Demo console
 
-| File | Role |
+| Path | Role |
 |------|------|
-| `console.html` | Operator layout — connection, SAP profile, LPR simulate, queue, slots |
-| `console.js` | Demo workflow orchestration, audit timeline polling |
-| `mw-api.js` | Shared HTTP + Socket.io API wrapper with localStorage config |
+| `app/console/page.tsx` + `features/console/ConsoleApp.tsx` | Operator layout — connection, SAP profile, LPR simulate, queue, slots |
+| `lib/mw-api.ts` | Shared HTTP + Socket.io API wrapper with localStorage config |
 
-**URL:** http://127.0.0.1:3000/console.html
+**URL:** http://127.0.0.1:3001/console
 
 Operator workflow: Connect → Save SAP profile → Send LPR plate → interact with avatar → Free slot → WhatsApp confirm → watch audit timeline.
 
 ### 6.3 Integration logs UI
 
-| File | Role |
+| Path | Role |
 |------|------|
-| `logs.html` | Filterable live log viewer |
-| `logs.js` | Socket.io `/logs` subscribe, append lines |
+| `app/logs/page.tsx` + `features/logs/LogsApp.tsx` | Filterable live log viewer |
+| Socket.io `/logs` on middleware | `logs.subscribe`, backlog + live tail |
 
-**URL:** http://127.0.0.1:3000/logs.html
+**URL:** http://127.0.0.1:3001/logs
 
 Tracks: `elevenlabs`, `lpr`, `nlu`, `sap`, `gate`, `notifications`, `tts`, `stt`.
 
@@ -587,14 +588,16 @@ npm run start:dev
 
 ### Demo console walkthrough
 
-1. Open http://127.0.0.1:3000/console.html
-2. **Connect** to middleware URL
-3. **Save SAP profile** — plate `ABC 1234`, name, phone
-4. **Send LPR plate read** — same plate
-5. Avatar greets on kiosk panel → click **Yes** or hold-to-speak
-6. **Set available slots** → **Free batch**
-7. **WhatsApp confirm** for the notified entry
-8. Watch **audit timeline** and open **logs.html** for integration trace
+1. Start middleware: `cd middleware && npm run start:dev` (port 3000)
+2. Start web UI: `cd web && npm run dev` (port 3001)
+3. Open http://127.0.0.1:3001/console
+4. **Connect** to middleware URL (`http://127.0.0.1:3000`)
+5. **Save SAP profile** — plate `ABC 1234`, name, phone
+6. **Send LPR plate read** — same plate
+7. Avatar greets on kiosk panel → click **Yes** or hold-to-speak
+8. **Set available slots** → **Free batch**
+9. **WhatsApp confirm** for the notified entry
+10. Watch **audit timeline** and open http://127.0.0.1:3001/logs for integration trace
 
 ### Automated proof
 

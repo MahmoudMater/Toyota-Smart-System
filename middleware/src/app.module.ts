@@ -1,9 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { LoggerModule } from 'nestjs-pino';
-import { ServeStaticModule } from '@nestjs/serve-static';
 import { ConfigService } from '@nestjs/config';
-import { join } from 'path';
 import { AppConfigModule } from './config/config.module';
 import { CommonModule } from './common/common.module';
 import { EventsModule } from './events/events.module';
@@ -45,22 +43,6 @@ import { Env } from './config/env.validation';
     EventEmitterModule.forRoot({
       wildcard: false,
       ignoreErrors: false,
-    }),
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'public'),
-      exclude: [
-        '/health(.*)',
-        '/session(.*)',
-        '/queue(.*)',
-        '/slots(.*)',
-        '/lpr(.*)',
-        '/demo(.*)',
-        '/audit(.*)',
-        '/notifications(.*)',
-        '/tts(.*)',
-        '/stt(.*)',
-        '/socket.io(.*)',
-      ],
     }),
     CommonModule,
     EventsModule,

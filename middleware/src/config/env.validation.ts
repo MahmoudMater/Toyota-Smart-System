@@ -27,7 +27,9 @@ export const envSchema = z.object({
   TTS_CACHE_TTL_SECONDS: z.coerce.number().default(86_400),
   CORS_ORIGINS: z
     .string()
-    .default('http://localhost:3000,http://127.0.0.1:3000'),
+    .default(
+      'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001',
+    ),
 
   // NLU (transcript interpretation)
   NLU_ADAPTER: z.enum(['rules', 'llm']).default('rules'),

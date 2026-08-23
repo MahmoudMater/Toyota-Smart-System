@@ -1,5 +1,20 @@
 # Releases
 
+## [2026-08-23 21:16] Migrate public UIs to Next.js with Al Sayer design system
+
+**By:** @MahmoudMater
+
+**Requested:** Migrate middleware/public to the Next.js web project with full feature parity and an Al Sayer design system based on alsayer.jpeg and ui-ux-pro-max.
+
+**Changes:**
+- Built Next.js app routes `/`, `/console`, `/logs` with full kiosk, demo console, and integration logs parity
+- Added Al Sayer HUD design system: tokens in `web/app/globals.css`, fonts, `Logo`, shared UI components, persisted `web/design-system/al-sayer-hayyak/`
+- Ported `mw-api.js` and `avatar.js` to `web/lib/mw-api.ts` and `web/components/avatar/KioskAvatar.tsx` (socket.io-client)
+- Removed NestJS `ServeStaticModule` and deleted legacy `middleware/public/*.html|js`
+- Extended CORS defaults for port 3001; updated `docs/client/Toyota-Smart-Gate-Technical-Handover.md` §6 URLs
+
+**Notes:** Run `cd web && npm run dev` (port 3001) alongside middleware on :3000. Set `NEXT_PUBLIC_MW_URL` via `web/.env.local.example`.
+
 ## [2026-08-23 20:44] README quick access docs + diagram links
 
 **By:** @MahmoudMater
