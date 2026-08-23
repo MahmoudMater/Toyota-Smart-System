@@ -1,5 +1,19 @@
 # Releases
 
+## [2026-08-23 20:44] README quick access docs + diagram links
+
+**By:** @MahmoudMater
+
+**Requested:** Attach diagram links in README and add quick-access links to all project docs.
+
+**Changes:**
+- Added **Quick access — project docs** table at top of `README.md` (handover Word/MD, design, presentation, middleware API, NLU sizing, releases, diagrams folder)
+- Added **Architecture diagrams (PNG)** table with links to all 10 diagram PNGs and descriptions
+- Restored embedded images for system context and end-to-end flow with full-size + Mermaid source links
+- Fixed broken markdown links / typo in the previous README
+
+**Notes:** Visitors landing on the repo root now get one-click paths to every client and developer doc.
+
 ## [2026-08-23 20:20] Client technical documentation pack
 
 **By:** @MahmoudMater
