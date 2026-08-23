@@ -1,0 +1,7 @@
+{
+  "source": "softaworks/agent-toolkit",
+  "sourceType": "git",
+  "repoUrl": "https://github.com/softaworks/agent-toolkit",
+  "subpath": "dist/plugins/mermaid-diagrams/skills/mermaid-diagrams",
+  "installedAt": "2026-08-23T17:12:15.851Z"
+}

@@ -1,0 +1,7 @@
+{
+  "source": "softaworks/agent-toolkit",
+  "sourceType": "git",
+  "repoUrl": "https://github.com/softaworks/agent-toolkit",
+  "subpath": "dist/plugins/ship-learn-next/skills/ship-learn-next",
+  "installedAt": "2026-08-23T17:12:15.856Z"
+}
