@@ -1,0 +1,37 @@
+flowchart TD
+    Start([Car arrives at Gate X]) --> LPR[LPR reads plate]
+    LPR --> MW[Middleware receives plate read]
+    MW --> SAP{SAP lookup}
+
+    SAP -->|Found| Kiosk[Push profile to kiosk avatar]
+    SAP -->|Not found| Closed1[Gate stays closed]
+    Closed1 --> Msg1[Show not recognized message]
+
+    Kiosk --> Confirm{Driver confirms on-file phone?}
+    Confirm -->|Yes| Open1[Open gate]
+    Confirm -->|No| Owner{Is driver the owner?}
+
+    Owner -->|Yes| Speak[Driver speaks visit phone]
+    Owner -->|No| Staff[Staff escalation after retries]
+
+    Speak --> STT[STT + NLU extract digits]
+    STT --> ReadBack[Avatar reads back phone]
+    ReadBack --> PhoneOK{Driver confirms digits?}
+    PhoneOK -->|Yes| Open2[Open gate]
+    PhoneOK -->|No| Speak
+
+    Open1 --> Enqueue[Enqueue visit in shared FIFO queue]
+    Open2 --> Enqueue
+
+    Enqueue --> Wait([Driver waits for garage slot])
+
+    Wait --> SlotFree[Slot availability reports slot free]
+    SlotFree --> Notify[Notify next queue entry via WhatsApp + SMS + App]
+    Notify --> Timer[Start 50s claim timer]
+
+    Timer --> Claim{WhatsApp confirm in time?}
+    Claim -->|Yes| Assign[Assign slot — pop from queue]
+    Claim -->|No| Shift[Shift entry back N positions]
+    Shift --> Notify
+
+    Assign --> Done([Visit complete for this slot cycle])

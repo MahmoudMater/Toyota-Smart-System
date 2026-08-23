@@ -1,0 +1,31 @@
+stateDiagram-v2
+    [*] --> AwaitingIdentityConfirm: SAP found — session created
+
+    AwaitingIdentityConfirm --> Done: Yes — use on-file phone
+    AwaitingIdentityConfirm --> AwaitingOwnerCheck: No — phone not correct
+    AwaitingIdentityConfirm --> StaffEscalation: 3 unclear retries
+
+    AwaitingOwnerCheck --> AwaitingPhoneSpeech: Yes — is owner
+    AwaitingOwnerCheck --> StaffEscalation: No — not owner
+    AwaitingOwnerCheck --> StaffEscalation: 3 unclear retries
+
+    AwaitingPhoneSpeech --> AwaitingPhoneConfirm: Digits extracted >= 7
+    AwaitingPhoneSpeech --> StaffEscalation: 3 unclear retries
+
+    AwaitingPhoneConfirm --> Done: Yes — pending phone confirmed
+    AwaitingPhoneConfirm --> AwaitingPhoneSpeech: No — try again
+    AwaitingPhoneConfirm --> StaffEscalation: 3 unclear retries
+
+    Done --> [*]: Gate open + queue enqueue
+    StaffEscalation --> [*]: Alert staff
+    NotRecognized --> [*]: Gate stays closed
+
+    note right of AwaitingIdentityConfirm
+        Greet by name
+        Confirm masked phone on file
+    end note
+
+    note right of AwaitingPhoneConfirm
+        Visit phone stored separately
+        SAP owner record unchanged
+    end note

@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+    actor Driver
+    participant UI as Kiosk Browser
+    participant Avatar as AvatarController
+    participant MW as Middleware STT/TTS
+    participant EL as ElevenLabs
+    participant NLU as NLU Service
+    participant SM as Kiosk State Machine
+
+    Note over UI,SM: After session.update with new prompt and speech fields
+
+    UI->>Avatar: setState listening
+    UI->>+MW: POST /tts text speech lang
+    MW->>EL: synthesize eleven_v3
+    EL-->>MW: MP3 audio
+    MW-->>-UI: audio bytes cached in Redis
+
+    UI->>Avatar: playWavAndLipSync — setState talking
+    Avatar->>Avatar: Web Audio RMS drives mouthOpen
+    Avatar->>Avatar: onended — setState idle or listening
+
+    Driver->>UI: Hold record button
+    UI->>UI: MediaRecorder capture webm
+    UI->>+MW: POST /stt multipart audio
+    MW->>EL: speech-to-text scribe_v2
+    EL-->>MW: transcript text
+    MW->>+NLU: interpret yes no digits
+    NLU-->>-MW: normalized + digits
+    MW-->>-UI: SttResult JSON
+
+    UI->>+SM: session.input via Socket.io
+    SM->>SM: handleInput transition
+    SM-->>-UI: session.update new prompt + speech

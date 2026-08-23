@@ -1,0 +1,34 @@
+sequenceDiagram
+    autonumber
+    actor Driver
+    participant Kiosk as Kiosk UI
+    participant MW as Middleware
+    participant STT as STT + NLU
+    participant Gate as Gate Adapter
+    participant Queue as Queue Engine
+    participant SAP as SAP / SAB
+
+    Note over Kiosk,SAP: Session already started with on-file phone from SAP
+
+    Driver->>Kiosk: No — phone not correct
+    Kiosk->>MW: session.input choice no
+    MW->>Kiosk: session.update — AwaitingOwnerCheck
+
+    Driver->>Kiosk: Yes — I am the owner
+    Kiosk->>MW: session.input choice yes
+    MW->>Kiosk: session.update — AwaitingPhoneSpeech
+
+    Driver->>Kiosk: Hold to speak phone number
+    Kiosk->>+STT: POST /stt audio
+    STT->>STT: ElevenLabs transcribe + NLU digits
+    STT-->>-Kiosk: text digits normalized
+
+    Kiosk->>MW: session.input source stt phone_digits
+    MW->>Kiosk: session.update — AwaitingPhoneConfirm read-back
+
+    Driver->>Kiosk: Yes — digits correct
+    Kiosk->>MW: session.input choice yes
+    MW->>MW: visitPhone set — SAP phone unchanged
+
+    MW->>Gate: openGate stub
+    MW->>Queue: enqueue with visit phone only

@@ -1,0 +1,53 @@
+flowchart LR
+    subgraph Core["Middleware core — unchanged when APIs arrive"]
+        LPRSvc[LprService ingest]
+        SapSvc[SapService lookup]
+        GateSvc[GateService open]
+        NotifSvc[NotificationsService send]
+        SttSvc[SttService]
+        TtsSvc[TtsService]
+        NluSvc[NluService]
+    end
+
+    subgraph Ports["Adapter ports — env-selected"]
+        LPRDto["PlateReadDto contract"]
+        SapPort["SapClient port"]
+        GatePort["GateControllerPort"]
+        NotifPort["NotificationSender"]
+        SttPort["SpeechTranscriber"]
+        TtsPort["SpeechSynthesizer"]
+        NluPort["TranscriptInterpreter"]
+    end
+
+    subgraph Today["Current implementations"]
+        LPRHttp["HTTP POST ingest — demo + future camera adapter"]
+        SapFake["FakeSapAdapter + demo Redis overrides"]
+        GateStub["StubGateAdapter — log only"]
+        NotifStub["StubNotificationAdapter — log only"]
+        ELStt["ElevenLabsSttAdapter — live"]
+        ELTts["ElevenLabsTtsAdapter — live"]
+        RulesNlu["RulesNluAdapter — default"]
+    end
+
+    subgraph Future["When vendor schemas arrive"]
+        LPRReal["Camera vendor adapter → PlateReadDto"]
+        SapHttp["HttpSapAdapter — real SAB API"]
+        GateReal["Real gate controller adapter"]
+        WaReal["WhatsApp Business Cloud adapter"]
+    end
+
+    LPRSvc --> LPRDto --> LPRHttp
+    LPRDto -.-> LPRReal
+
+    SapSvc --> SapPort --> SapFake
+    SapPort -.-> SapHttp
+
+    GateSvc --> GatePort --> GateStub
+    GatePort -.-> GateReal
+
+    NotifSvc --> NotifPort --> NotifStub
+    NotifPort -.-> WaReal
+
+    SttSvc --> SttPort --> ELStt
+    TtsSvc --> TtsPort --> ELTts
+    NluSvc --> NluPort --> RulesNlu

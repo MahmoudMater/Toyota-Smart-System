@@ -1,0 +1,20 @@
+flowchart TD
+    Start([Slot becomes free]) --> FreeEvent[POST /slots/freed or webhook]
+    FreeEvent --> Engine[Queue engine tryNotifyNext]
+    Engine --> Peek[Peek first waiting or skipped entry]
+    Peek --> Empty{Queue empty?}
+
+    Empty -->|Yes| WaitMore([Wait for next slot or enqueue])
+    Empty -->|No| Notify[Mark entry notified — send WhatsApp SMS App]
+    Notify --> Timer[Schedule BullMQ claim timer 50s]
+    Timer --> Check{WhatsApp confirm received?}
+
+    Check -->|Yes in time| Confirm[queue.claim.confirmed]
+    Confirm --> Assign[Pop entry — assign slot — clear plate lock]
+    Assign --> Success([Slot assigned — done])
+
+    Check -->|No — timeout| Timeout[queue.claim.timeout]
+    Timeout --> Shift[Shift entry back N positions]
+    Shift --> Note[N grows with consecutive misses per slot]
+    Note --> ReNotify[tryNotifyNext same slot — next FIFO head]
+    ReNotify --> Peek

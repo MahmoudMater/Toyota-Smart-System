@@ -1,0 +1,25 @@
+sequenceDiagram
+    autonumber
+    actor Driver
+    participant LPR as LPR Camera
+    participant MW as Middleware
+    participant SAP as SAP / SAB
+    participant Kiosk as Kiosk UI
+    participant Gate as Gate Adapter
+    participant Queue as Queue Engine
+
+    LPR->>+MW: POST /lpr/plate-read
+    MW->>+SAP: lookupByPlate(plate)
+    SAP-->>-MW: ClientProfile name phone plate
+    MW->>MW: createSession + save Redis
+    MW->>Kiosk: session.update via Socket.io /kiosk
+
+    Driver->>Kiosk: Yes — touch or voice
+    Kiosk->>+MW: session.input choice yes
+    MW->>MW: handleInput — state Done
+    MW->>Kiosk: session.update
+
+    MW->>Gate: openGate(gateId) stub
+    Gate-->>MW: gate.opened event
+    MW->>+Queue: enqueueVisit plate phone gateId
+    Queue-->>-MW: queue.enqueued

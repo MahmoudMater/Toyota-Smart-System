@@ -1,0 +1,28 @@
+C4Container
+    title Container Diagram — Smart Gate Middleware
+
+    Person(driver, "Driver", "Uses kiosk at gate")
+    Person(staff, "Staff", "Uses demo console")
+
+    System_Boundary(mw, "Smart Gate Middleware") {
+        Container(kiosk_ui, "Kiosk UI", "HTML/JS WebView", "Avatar, voice capture, touch input")
+        Container(console_ui, "Demo Console", "HTML/JS", "Simulates LPR, SAP, queue, WhatsApp confirm")
+        Container(logs_ui, "Integration Logs UI", "HTML/JS", "Live tail of external API calls")
+        Container(nest, "NestJS API", "Node.js / TypeScript", "Modules: LPR, SAP, Kiosk, Queue, Gate, Notifications, STT, TTS, NLU, Audit, Demo")
+        Container(socket, "Socket.io Gateways", "WebSocket", "Namespaces: /kiosk, /logs")
+        ContainerDb(redis, "Redis", "Redis 7", "Sessions, queue, TTS cache, audit stream, BullMQ backend")
+    }
+
+    System_Ext(ext, "External systems", "LPR, SAP, Gate, Slots, WhatsApp, ElevenLabs")
+
+    Rel(driver, kiosk_ui, "Speaks and taps")
+    Rel(staff, console_ui, "Runs end-to-end demo")
+    Rel(staff, logs_ui, "Monitors integrations")
+    Rel(kiosk_ui, nest, "REST: /tts, /stt, /session")
+    Rel(kiosk_ui, socket, "Real-time session updates", "WebSocket /kiosk")
+    Rel(console_ui, nest, "REST: /lpr, /demo, /queue, /slots")
+    Rel(console_ui, socket, "Session push", "WebSocket /kiosk")
+    Rel(logs_ui, socket, "Live log lines", "WebSocket /logs")
+    Rel(nest, redis, "Read/write live state")
+    Rel(nest, ext, "Adapter calls")
+    Rel(socket, nest, "Session input handling")

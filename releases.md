@@ -1,5 +1,20 @@
 # Releases
 
+## [2026-08-23 20:20] Client technical documentation pack
+
+**By:** @MahmoudMater
+
+**Requested:** Write README and complete client-technical Word handover covering middleware, UIs, kiosk approach, integrations, adapters, sockets, voice pipeline, and project flows with Mermaid diagrams.
+
+**Changes:**
+- Added root `README.md` — product overview, repo map, quick start, three UIs, architecture diagrams
+- Added `docs/client/Toyota-Smart-Gate-Technical-Handover.md` — full 17-section client technical document
+- Added `docs/client/Toyota-Smart-Gate-Technical-Handover.docx` — Word delivery with embedded diagram PNGs
+- Added 10 Mermaid diagrams under `docs/client/diagrams/` (`.mmd` + `.png`): system context, containers, end-to-end flow, kiosk state, sequences, queue, adapters
+- Added `docs/client/build-docx.mjs` — Node script to regenerate `.docx` from markdown
+
+**Notes:** Diagram PNGs exported via `@mermaid-js/mermaid-cli` with `--no-sandbox` puppeteer config. Pandoc not available; docx built with `docx` npm package.
+
 ## [2026-08-11 15:46] Retry ElevenLabs 429 system_busy
 
 **By:** @MahmoudMater

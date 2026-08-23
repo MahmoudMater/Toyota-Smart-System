@@ -1,0 +1,27 @@
+C4Context
+    title System Context — Toyota Smart Gate Phase 1
+
+    Person(driver, "Driver", "Arrives at gate in vehicle")
+    Person(staff, "Branch staff", "Monitors demo console and integration logs")
+
+    System(middleware, "Smart Gate Middleware", "NestJS brain: kiosk sessions, queue, gate commands, notifications")
+
+    System_Ext(lpr, "LPR Camera", "Reads plate at each gate")
+    System_Ext(sap, "SAP / SAB", "Toyota customer database — lookup by plate")
+    System_Ext(gate, "Gate Controller", "Physical barrier at each entry gate")
+    System_Ext(slots, "Slot Availability System", "Reports free garage slots")
+    System_Ext(whatsapp, "WhatsApp Business", "Claim confirmation source of truth")
+    System_Ext(sms, "SMS Gateway", "Informational ping only")
+    System_Ext(app, "Toyota App", "Push notification ping only")
+    System_Ext(elevenlabs, "ElevenLabs Cloud", "STT and TTS for kiosk voice")
+
+    Rel(driver, middleware, "Confirms identity via kiosk voice/touch")
+    Rel(staff, middleware, "Runs demo console and monitors logs")
+    Rel(lpr, middleware, "Plate read event", "HTTP POST")
+    Rel(middleware, sap, "Lookup client by plate", "API")
+    Rel(middleware, gate, "Open gate command")
+    Rel(slots, middleware, "Slot freed event", "Webhook or HTTP")
+    Rel(middleware, whatsapp, "Slot claim notification + webhook")
+    Rel(middleware, sms, "Parallel informational ping")
+    Rel(middleware, app, "Parallel push ping")
+    Rel(middleware, elevenlabs, "STT / TTS requests", "HTTPS")
