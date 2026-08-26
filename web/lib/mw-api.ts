@@ -3,6 +3,9 @@ import {
   DEFAULT_MW_URL,
   STORAGE_KEY,
   type AuditEvent,
+  type CheckinDisplay,
+  type CheckinSubmitResult,
+  type CheckinTicketView,
   type DemoConfig,
   type HealthResponse,
   type PublicSession,
@@ -17,6 +20,7 @@ export type MwSocketHandlers = {
   onDisconnect?: () => void;
   onError?: (err: Error) => void;
   onSessionUpdate?: (session: PublicSession) => void;
+  onCheckinDisplay?: (display: CheckinDisplay) => void;
 };
 
 export function createMwApi(options: { baseUrl?: string } = {}) {
@@ -187,6 +191,33 @@ export function createMwApi(options: { baseUrl?: string } = {}) {
     return request<PublicSession>("POST", "/session/start", { gateId });
   }
 
+  function checkinDisplay(gateId: string) {
+    return request<CheckinDisplay>(
+      "GET",
+      `/checkin/display/${encodeURIComponent(gateId)}`,
+    );
+  }
+
+  function checkinTicket(token: string, gateId?: string) {
+    const q = gateId
+      ? `?gateId=${encodeURIComponent(gateId)}`
+      : "";
+    return request<CheckinTicketView>(
+      "GET",
+      `/checkin/tickets/${encodeURIComponent(token)}${q}`,
+    );
+  }
+
+  function checkinSubmit(payload: {
+    token?: string;
+    gateId: string;
+    plateNumber: string;
+    name: string;
+    phone: string;
+  }) {
+    return request<CheckinSubmitResult>("POST", "/checkin/submit", payload);
+  }
+
   function connectSocket(handlers: MwSocketHandlers = {}) {
     if (socket) {
       socket.disconnect();
@@ -206,6 +237,9 @@ export function createMwApi(options: { baseUrl?: string } = {}) {
     );
     socket.on("session.update", (data: PublicSession) =>
       handlers.onSessionUpdate?.(data),
+    );
+    socket.on("checkin.display", (data: CheckinDisplay) =>
+      handlers.onCheckinDisplay?.(data),
     );
     return socket;
   }
@@ -284,6 +318,9 @@ export function createMwApi(options: { baseUrl?: string } = {}) {
     auditEvents,
     sessionInput,
     sessionStart,
+    checkinDisplay,
+    checkinTicket,
+    checkinSubmit,
     connectSocket,
     joinGate,
     emitSessionInput,

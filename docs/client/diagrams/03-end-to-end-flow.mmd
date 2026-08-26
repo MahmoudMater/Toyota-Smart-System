@@ -1,11 +1,11 @@
 flowchart TD
-    Start([Car arrives at Gate X]) --> LPR[LPR reads plate]
+    Start([Car arrives at Gate X — Approach A Voice]) --> LPR[LPR reads plate]
     LPR --> MW[Middleware receives plate read]
     MW --> SAP{SAP lookup}
 
     SAP -->|Found| Kiosk[Push profile to kiosk avatar]
-    SAP -->|Not found| Closed1[Gate stays closed]
-    Closed1 --> Msg1[Show not recognized message]
+    SAP -->|Not found| Closed1[Show not recognized on avatar]
+    Closed1 --> Msg1[Approach A: gate stays closed until staff]
 
     Kiosk --> Confirm{Driver confirms on-file phone?}
     Confirm -->|Yes| Open1[Open gate]

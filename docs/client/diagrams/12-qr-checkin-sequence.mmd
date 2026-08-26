@@ -1,0 +1,40 @@
+sequenceDiagram
+    autonumber
+    participant Car
+    participant LPR
+    participant MW as Middleware
+    participant SAP
+    participant Kiosk
+    participant Phone
+    participant Queue
+    participant Gate
+
+    Note over Car,Gate: Path A — Generic QR always available
+    Kiosk->>Phone: Generic URL /checkin?gate=gateId
+    Phone->>MW: POST /checkin/submit plate name phone
+    MW->>Queue: enqueueFromCheckin
+    alt New plate
+        MW->>Gate: open if rate-limit NX 30s OK
+    else Duplicate plate
+        MW-->>Phone: 409 already_queued
+    end
+
+    Note over Car,Gate: Path B — LPR + SAP miss
+    Car->>LPR: Approach gate
+    LPR->>MW: plate-read
+    MW->>SAP: lookupByPlate
+    SAP-->>MW: null
+    MW->>Kiosk: Token QR plate prefilled editable
+    Phone->>MW: GET ticket then submit name phone
+    MW->>Queue: enqueue
+    MW->>Gate: open if rate limit OK
+
+    Note over Car,Gate: Path C — LPR + SAP hit
+    Car->>LPR: Approach gate
+    LPR->>MW: plate-read
+    MW->>SAP: lookupByPlate
+    SAP-->>MW: name phone plate
+    MW->>Kiosk: Welcome name + Token QR
+    Phone->>MW: Prefill locked plate then Submit
+    MW->>Queue: enqueue
+    MW->>Gate: open if rate limit OK

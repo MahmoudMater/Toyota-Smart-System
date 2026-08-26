@@ -78,6 +78,35 @@ export interface ActiveClaim {
   notifiedAt: string;
 }
 
+export type CheckinDisplayMode = "generic" | "lpr" | "sap" | "submitted";
+
+export interface CheckinDisplay {
+  mode: CheckinDisplayMode;
+  gateId: string;
+  checkinUrl: string;
+  customerName?: string;
+  plateNumber?: string;
+  expiresAt?: string;
+  token?: string;
+}
+
+export interface CheckinTicketView {
+  token: string;
+  gateId: string;
+  plateNumber: string;
+  name: string;
+  phone: string;
+  plateLocked: boolean;
+  source: "sap" | "lpr" | "generic";
+  expiresAt: string;
+}
+
+export interface CheckinSubmitResult {
+  entryId: string;
+  plateNumber: string;
+  gateOpened: boolean;
+}
+
 export const DEFAULT_MW_URL =
   process.env.NEXT_PUBLIC_MW_URL ?? "http://127.0.0.1:3000";
 

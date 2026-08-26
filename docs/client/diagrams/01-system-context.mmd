@@ -2,9 +2,10 @@ C4Context
     title System Context — Toyota Smart Gate Phase 1
 
     Person(driver, "Driver", "Arrives at gate in vehicle")
-    Person(staff, "Branch staff", "Monitors demo console and integration logs")
+    Person(phone, "Driver phone", "Opens QR check-in form")
+    Person(staff, "Branch staff", "Monitors Voice/QR consoles and logs")
 
-    System(middleware, "Smart Gate Middleware", "NestJS brain: kiosk sessions, queue, gate commands, notifications")
+    System(middleware, "Smart Gate Middleware", "NestJS brain: dual entry (voice or QR), queue, gate, notifications")
 
     System_Ext(lpr, "LPR Camera", "Reads plate at each gate")
     System_Ext(sap, "SAP / SAB", "Toyota customer database — lookup by plate")
@@ -13,10 +14,11 @@ C4Context
     System_Ext(whatsapp, "WhatsApp Business", "Claim confirmation source of truth")
     System_Ext(sms, "SMS Gateway", "Informational ping only")
     System_Ext(app, "Toyota App", "Push notification ping only")
-    System_Ext(elevenlabs, "ElevenLabs Cloud", "STT and TTS for kiosk voice")
+    System_Ext(elevenlabs, "ElevenLabs Cloud", "STT and TTS for Approach A voice")
 
-    Rel(driver, middleware, "Confirms identity via kiosk voice/touch")
-    Rel(staff, middleware, "Runs demo console and monitors logs")
+    Rel(driver, middleware, "Confirms via kiosk voice/touch OR QR form")
+    Rel(phone, middleware, "Submits plate name phone over HTTPS")
+    Rel(staff, middleware, "Runs Voice Console or QR Console")
     Rel(lpr, middleware, "Plate read event", "HTTP POST")
     Rel(middleware, sap, "Lookup client by plate", "API")
     Rel(middleware, gate, "Open gate command")
@@ -24,4 +26,4 @@ C4Context
     Rel(middleware, whatsapp, "Slot claim notification + webhook")
     Rel(middleware, sms, "Parallel informational ping")
     Rel(middleware, app, "Parallel push ping")
-    Rel(middleware, elevenlabs, "STT / TTS requests", "HTTPS")
+    Rel(middleware, elevenlabs, "STT / TTS (Approach A)", "HTTPS")

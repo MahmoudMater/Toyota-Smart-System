@@ -1,0 +1,25 @@
+flowchart TB
+    LPR[LPR plate read] --> SAP{SAP lookup}
+    SAP -->|Found or miss| Dual[Middleware dual emit]
+
+    Dual --> A[Approach A — Voice avatar]
+    Dual --> B[Approach B — QR check-in]
+
+    subgraph approachA [Approach A]
+        A --> Sess[Create kiosk session]
+        Sess --> Avatar[Avatar greets / not recognized]
+        Avatar --> Confirm[Yes/No or STT phone]
+        Confirm --> GateA[Open gate + enqueue]
+    end
+
+    subgraph approachB [Approach B]
+        B --> Mint[Mint opaque Redis ticket TTL 180s]
+        Mint --> QR[Kiosk shows QR + Welcome name]
+        QR --> Form[Phone opens /checkin form]
+        Form --> Submit[POST /checkin/submit]
+        Submit --> GateB[Enqueue + rate-limited gate open]
+    end
+
+    GateA --> Queue[Shared FIFO queue — Module 2 unchanged]
+    GateB --> Queue
+    Queue --> Claim[50s WhatsApp claim + shift-back]

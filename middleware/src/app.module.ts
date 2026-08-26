@@ -9,6 +9,7 @@ import { RedisModule } from './redis/redis.module';
 import { LprModule } from './modules/lpr/lpr.module';
 import { SapModule } from './modules/sap/sap.module';
 import { GateModule } from './modules/gate/gate.module';
+import { CheckinModule } from './modules/checkin/checkin.module';
 import { KioskModule } from './modules/kiosk/kiosk.module';
 import { QueueEngineModule } from './modules/queue-engine/queue-engine.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -50,6 +51,7 @@ import { Env } from './config/env.validation';
     LprModule,
     SapModule,
     GateModule,
+    CheckinModule,
     KioskModule,
     QueueEngineModule,
     NotificationsModule,

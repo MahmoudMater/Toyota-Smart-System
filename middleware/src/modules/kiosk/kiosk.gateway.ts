@@ -1,4 +1,5 @@
-import { forwardRef, Inject } from '@nestjs/common';
+import { Inject, forwardRef } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
   MessageBody,
@@ -10,6 +11,9 @@ import {
 } from '@nestjs/websockets';
 import { PinoLogger } from 'nestjs-pino';
 import { Server, Socket } from 'socket.io';
+import { DomainEvents } from '../../events/domain-events';
+import type { CheckinDisplayPayload } from '../../events/domain-events';
+import { CheckinService } from '../checkin/checkin.service';
 import { KioskService } from './kiosk.service';
 import { PublicSession, SessionInput } from './state-machine';
 
@@ -26,6 +30,7 @@ export class KioskGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     @Inject(forwardRef(() => KioskService))
     private readonly kioskService: KioskService,
+    private readonly checkin: CheckinService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(KioskGateway.name);
@@ -40,7 +45,7 @@ export class KioskGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('kiosk.join')
-  handleJoin(
+  async handleJoin(
     @ConnectedSocket() client: Socket,
     @MessageBody() body: { gateId?: string },
   ) {
@@ -51,7 +56,9 @@ export class KioskGateway implements OnGatewayConnection, OnGatewayDisconnect {
       { socketId: client.id, gateId, room },
       'kiosk.socket.join',
     );
-    return { ok: true, gateId, room };
+    const display = await this.checkin.getDisplay(gateId);
+    client.emit('checkin.display', display);
+    return { ok: true, gateId, room, display };
   }
 
   @SubscribeMessage('session.input')
@@ -77,17 +84,27 @@ export class KioskGateway implements OnGatewayConnection, OnGatewayDisconnect {
     return { ok: !!session, session };
   }
 
-  pushSession(gateId: string, session: PublicSession): void {
-    const room = gateRoom(gateId);
+  @OnEvent(DomainEvents.CheckinDisplayUpdated)
+  onCheckinDisplay(display: CheckinDisplayPayload): void {
+    this.pushCheckinDisplay(display);
+  }
+
+  pushCheckinDisplay(display: CheckinDisplayPayload): void {
+    const room = gateRoom(display.gateId);
     this.logger.info(
       {
-        gateId,
+        gateId: display.gateId,
         room,
-        sessionId: session.session_id,
-        state: session.state,
+        mode: display.mode,
       },
-      'kiosk.socket.session.push',
+      'kiosk.socket.checkin.display',
     );
+    this.server?.to(room).emit('checkin.display', display);
+  }
+
+  /** @deprecated Voice UI path — kept for unused session tooling. */
+  pushSession(gateId: string, session: PublicSession): void {
+    const room = gateRoom(gateId);
     this.server?.to(room).emit('session.update', session);
   }
 }

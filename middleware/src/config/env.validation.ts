@@ -30,6 +30,11 @@ export const envSchema = z.object({
     .default(
       'http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001',
     ),
+  CHECKIN_PUBLIC_BASE_URL: z
+    .string()
+    .default('http://127.0.0.1:3001/checkin'),
+  CHECKIN_TOKEN_TTL_SECONDS: z.coerce.number().default(180),
+  GATE_OPEN_RATE_LIMIT_SECONDS: z.coerce.number().default(30),
 
   // NLU (transcript interpretation)
   NLU_ADAPTER: z.enum(['rules', 'llm']).default('rules'),

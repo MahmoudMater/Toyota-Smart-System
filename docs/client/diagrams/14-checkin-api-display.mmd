@@ -1,0 +1,45 @@
+sequenceDiagram
+    autonumber
+    participant Kiosk as QR Kiosk / QR Console
+    participant Phone as Check-in form
+    participant API as NestJS CheckinController
+    participant Svc as CheckinService
+    participant Redis
+    participant Queue as QueueEngine
+    participant Gate as GateService
+    participant Sock as KioskGateway
+
+    Kiosk->>Sock: kiosk.join gateId
+    Sock->>Svc: getDisplay
+    Svc->>Redis: GET checkin:gate:gateId
+    Svc-->>Sock: CheckinDisplay
+    Sock-->>Kiosk: checkin.display
+
+    Note over Svc,Sock: After LPR or SAP mint
+    Svc->>Redis: SET ticket + gate key EX 180
+    Svc->>Sock: CheckinDisplayUpdated
+    Sock-->>Kiosk: checkin.display mode sap or lpr
+
+    Phone->>API: GET /checkin/tickets/:token
+    API->>Svc: getTicket
+    alt Valid
+        Svc-->>Phone: plate name phone plateLocked expiresAt
+    else Missing used expired
+        Svc-->>Phone: 410 with optional plate hint
+    end
+
+    Phone->>API: POST /checkin/submit
+    API->>Svc: submit
+    Svc->>Queue: enqueueFromCheckin
+    alt created false
+        Svc-->>Phone: 409 already_queued
+    else created true
+        Svc->>Redis: SET NX checkin:gate:open EX 30
+        alt Acquired
+            Svc->>Gate: openForVisit
+        else Rate limited
+            Note over Svc: Still enqueued without second open
+        end
+        Svc->>Sock: checkin.display submitted then generic
+        Svc-->>Phone: entryId plateNumber gateOpened
+    end

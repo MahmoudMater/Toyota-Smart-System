@@ -1,5 +1,46 @@
 # Releases
 
+## [2026-08-26 19:46] Client docs: append QR check-in (dual approach)
+
+**By:** @MahmoudMater
+
+**Requested:** Append the QR check-in approach to client docs, diagrams, README, and the handover Word file for the client report.
+
+**Changes:**
+- Added diagrams 11–14 (dual approaches, QR sequence, ticket lifecycle, check-in API) and updated 01, 02, 03, 08; re-exported PNGs
+- Extended `docs/client/Toyota-Smart-Gate-Technical-Handover.md` with Approach A/B framing, §8b QR check-in, APIs/env/events/demos; rebuilt `.docx`
+- Updated root `README.md`, `toyota-gate-queue-system-design.md` (§2.4), and `middleware/README.md` for Next UIs + check-in
+
+**Notes:** Presentation deck not updated in this pass. PDF not regenerated — Word is the delivery artifact.
+
+## [2026-08-26 19:09] Dual demo consoles: voice + QR
+
+**By:** @MahmoudMater
+
+**Requested:** Keep the main avatar/TTS/STT console and put the QR check-in console on a separate screen so both approaches can be presented.
+
+**Changes:**
+- Restored voice avatar console at `/console` (`web/features/console/ConsoleApp.tsx`)
+- Moved QR check-in console to `/console/qr` (`QrConsoleApp.tsx` + `web/app/console/qr/page.tsx`)
+- Nav labels: Voice Console + QR Console; kiosk footer links updated
+- Backend dual path: SAP found/miss mints QR tickets **and** starts voice sessions; gate opens again on voice confirm
+
+**Notes:** Present Approach A at `/console`, Approach B at `/console/qr` (and QR kiosk at `/`). Reset between demos if the same plate is reused.
+
+## [2026-08-24 14:44] QR check-in flow (replace kiosk voice)
+
+**By:** @mahmoudgamalmatter
+
+**Requested:** Implement the QR check-in plan (dual QR: generic gate form + LPR/SAP token QR; enqueue + rate-limited gate open).
+
+**Changes:**
+- Wired `CheckinModule` (Redis tickets, `GET/POST /checkin/*`, `CheckinSubmitted` / display events, env TTL + public base URL + 30s gate rate limit)
+- Rewired SAP found/not-found to mint tickets (no voice FSM); kiosk socket pushes `checkin.display`; LPR stays active on SAP miss (`checkin_pending`)
+- Added mobile `/checkin` form, QR kiosk UI, console QR preview; updated `prove_flow.sh` to submit check-in instead of session yes
+- Added `qrcode` dependency in `web`; unit tests for plate-lock / Redis key helpers in `middleware/src/modules/checkin/`
+
+**Notes:** Start Redis (`middleware/docker-compose.yml`) then `npm run prove` in middleware. Voice TTS/STT/NLU code remains but is unused on the live lane.
+
 ## [2026-08-23 21:16] Migrate public UIs to Next.js with Al Sayer design system
 
 **By:** @MahmoudMater

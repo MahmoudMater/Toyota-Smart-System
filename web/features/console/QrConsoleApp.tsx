@@ -1,30 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import QRCode from "qrcode";
 import { HudNav } from "@/components/layout/HudNav";
-import { KioskAvatar, type KioskAvatarHandle } from "@/components/avatar/KioskAvatar";
 import { HudPanel } from "@/components/ui/HudPanel";
 import { GlowButton } from "@/components/ui/GlowButton";
 import { HudInput } from "@/components/ui/HudInput";
-import { Keypad } from "@/components/ui/Keypad";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { Badge } from "@/components/ui/Badge";
-import { pickAudioMime } from "@/lib/audio";
 import { createMwApi } from "@/lib/mw-api";
 import {
   DEFAULT_MW_URL,
   STORAGE_KEY,
   type ActiveClaim,
   type AuditEvent,
-  type PublicSession,
+  type CheckinDisplay,
   type QueueEntry,
-  type SessionInputPayload,
 } from "@/lib/types";
 
-export function ConsoleApp() {
+export function QrConsoleApp() {
   const api = useMemo(() => createMwApi(), []);
-  const avatarRef = useRef<KioskAvatarHandle>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
 
   const [middlewareUrl, setMiddlewareUrl] = useState(() => {
     if (typeof window !== "undefined") {
@@ -42,16 +37,15 @@ export function ConsoleApp() {
   const [sapName, setSapName] = useState("Mahmoud Mater");
   const [sapPhone, setSapPhone] = useState("0555123456");
   const [sapPlate, setSapPlate] = useState("TKN 9001");
-  const [sapStatus, setSapStatus] = useState("Save a profile, then send that plate via LPR.");
+  const [sapStatus, setSapStatus] = useState(
+    "Save a profile, then send that plate via LPR.",
+  );
 
   const [lprPlate, setLprPlate] = useState("TKN 9001");
   const [lprStatus, setLprStatus] = useState("Waiting for plate read…");
 
-  const [session, setSession] = useState<PublicSession | null>(null);
-  const [sessionStatus, setSessionStatus] = useState("");
-  const [phoneInput, setPhoneInput] = useState("");
-  const [recordStatus, setRecordStatus] = useState("");
-  const [avatarStatus, setAvatarStatus] = useState("idle");
+  const [display, setDisplay] = useState<CheckinDisplay | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   const [availableSlots, setAvailableSlots] = useState("1");
   const [slotsStatus, setSlotsStatus] = useState(
@@ -66,91 +60,22 @@ export function ConsoleApp() {
   const [timeline, setTimeline] = useState<AuditEvent[]>([]);
 
   const claimTimeoutMsRef = useRef(50_000);
-  const lastSpokenPromptRef = useRef("");
-  const speakingRef = useRef(false);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const answerRecorderRef = useRef<MediaRecorder | null>(null);
-  const answerChunksRef = useRef<Blob[]>([]);
-  const answerStreamRef = useRef<MediaStream | null>(null);
-  const answerRecordingRef = useRef(false);
-  const answerBusyRef = useRef(false);
-
-  const sessionId = session?.session_id ?? null;
-  const sessionState = session?.state ?? "idle";
-  const sessionLang = session?.lang ?? "en";
-
-  const awaitingYesNo = [
-    "awaiting_identity_confirm",
-    "awaiting_owner_check",
-    "awaiting_phone_confirm",
-  ].includes(sessionState);
-  const needPhone = sessionState === "awaiting_phone_speech";
-  const recordDisabled = ["done", "staff_escalation", "idle", "not_recognized"].includes(
-    sessionState,
-  );
-
-  const speakText = useCallback(
-    async (text: string, lang = sessionLang) => {
-      if (!text) return;
-      speakingRef.current = true;
-      avatarRef.current?.setState("talking");
-      try {
-        api.setBaseUrl(middlewareUrl);
-        const { buffer, contentType } = await api.tts(text, lang);
-        const audioEl = audioRef.current;
-        if (!audioEl) return;
-        await avatarRef.current?.playAndLipSync(buffer, audioEl, contentType);
-      } catch (err) {
-        setSessionStatus(
-          `TTS error: ${err instanceof Error ? err.message : String(err)}. Is middleware running at ${api.getBaseUrl()}?`,
-        );
-        avatarRef.current?.setState("idle");
-      } finally {
-        speakingRef.current = false;
-      }
-    },
-    [api, middlewareUrl, sessionLang],
-  );
-
-  const renderSession = useCallback((data: PublicSession | null) => {
-    if (!data) return;
-    setSession(data);
-    setSessionStatus(
-      JSON.stringify(
-        {
-          state: data.state,
-          gate_id: data.gate_id,
-          retries: data.retries,
-          gate_open_stub: data.gate_open_stub,
-          visit_phone: data.visit_phone,
-        },
-        null,
-        2,
-      ),
-    );
-    if (data.avatar_state && !speakingRef.current) {
-      avatarRef.current?.setState(data.avatar_state);
+  const applyDisplay = useCallback(async (next: CheckinDisplay) => {
+    setDisplay(next);
+    try {
+      const url = await QRCode.toDataURL(next.checkinUrl, {
+        width: 280,
+        margin: 1,
+        color: { dark: "#021018", light: "#e8f4ff" },
+      });
+      setQrDataUrl(url);
+    } catch {
+      setQrDataUrl(null);
     }
   }, []);
-
-  const applyPromptSpeech = useCallback(
-    async (data: PublicSession) => {
-      if (!data.prompt || data.prompt === lastSpokenPromptRef.current) return;
-      lastSpokenPromptRef.current = data.prompt;
-      await speakText(data.speech || data.prompt, data.lang || "en");
-      const listening = [
-        "awaiting_identity_confirm",
-        "awaiting_owner_check",
-        "awaiting_phone_speech",
-        "awaiting_phone_confirm",
-      ];
-      if (listening.includes(data.state)) avatarRef.current?.setState("listening");
-      else avatarRef.current?.setState(data.avatar_state || "idle");
-    },
-    [speakText],
-  );
 
   const renderQueue = useCallback((entries: QueueEntry[]) => {
     setQueueEntries(entries);
@@ -192,7 +117,9 @@ export function ConsoleApp() {
       }
       setQueueStatus(`Updated ${new Date().toLocaleTimeString()}`);
     } catch (err) {
-      setQueueStatus(`Refresh error: ${err instanceof Error ? err.message : String(err)}`);
+      setQueueStatus(
+        `Refresh error: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }, [api, middlewareUrl, renderQueue]);
 
@@ -205,7 +132,7 @@ export function ConsoleApp() {
       const [health, cfg] = await Promise.all([api.health(), api.demoConfig()]);
       claimTimeoutMsRef.current = cfg.claimTimeoutMs || 50_000;
       setConfigStatus(
-        `OK · middleware ${health.service || "up"} · TTS=${health.tts_voices || "?"} · STT=${health.stt_model || "?"} · claim ${claimTimeoutMsRef.current / 1000}s`,
+        `OK · middleware ${health.service || "up"} · claim ${claimTimeoutMsRef.current / 1000}s`,
       );
 
       api.connectSocket({
@@ -214,9 +141,15 @@ export function ConsoleApp() {
           setConnLabel("Socket connected");
           api.joinGate(gateId.trim() || "gate-1", (ack) => {
             setConnLabel(
-              ack?.ok ? `Joined gate:${gateId.trim() || "gate-1"}` : "Join failed",
+              ack?.ok
+                ? `Joined gate:${gateId.trim() || "gate-1"}`
+                : "Join failed",
             );
           });
+          void api
+            .checkinDisplay(gateId.trim() || "gate-1")
+            .then(applyDisplay)
+            .catch(() => undefined);
         },
         onDisconnect: () => {
           setConnected(false);
@@ -226,9 +159,8 @@ export function ConsoleApp() {
           setConnected(false);
           setConnLabel(`Socket error: ${err.message}`);
         },
-        onSessionUpdate: async (data) => {
-          renderSession(data);
-          await applyPromptSpeech(data);
+        onCheckinDisplay: (data) => {
+          void applyDisplay(data);
           void refreshAll();
         },
       });
@@ -242,14 +174,7 @@ export function ConsoleApp() {
       );
       setConnLabel("Failed");
     }
-  }, [
-    api,
-    middlewareUrl,
-    gateId,
-    renderSession,
-    applyPromptSpeech,
-    refreshAll,
-  ]);
+  }, [api, middlewareUrl, gateId, applyDisplay, refreshAll]);
 
   useEffect(() => {
     void connect();
@@ -269,7 +194,8 @@ export function ConsoleApp() {
       const next: Record<string, number> = {};
       let expired = false;
       for (const c of activeClaims) {
-        const end = new Date(c.notifiedAt).getTime() + claimTimeoutMsRef.current;
+        const end =
+          new Date(c.notifiedAt).getTime() + claimTimeoutMsRef.current;
         const left = Math.max(0, end - Date.now());
         next[c.entryId] = Math.ceil(left / 1000);
         if (left <= 0) expired = true;
@@ -285,81 +211,9 @@ export function ConsoleApp() {
     };
   }, [activeClaims, refreshAll]);
 
-  const sendInput = async (payload: SessionInputPayload) => {
-    if (!sessionId) return;
-    try {
-      api.setBaseUrl(middlewareUrl);
-      const next = await api.emitSessionInput(sessionId, payload);
-      renderSession(next);
-      await applyPromptSpeech(next);
-      void refreshAll();
-    } catch (err) {
-      setSessionStatus(String(err instanceof Error ? err.message : err));
-    }
-  };
-
-  const startAnswerRecording = async () => {
-    if (answerBusyRef.current || answerRecordingRef.current || recordDisabled) return;
-    if (!sessionId) {
-      setRecordStatus("No active session yet.");
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      answerStreamRef.current = stream;
-      answerChunksRef.current = [];
-      const mime = pickAudioMime();
-      answerRecorderRef.current = mime
-        ? new MediaRecorder(stream, { mimeType: mime })
-        : new MediaRecorder(stream);
-      answerRecorderRef.current.ondataavailable = (e) => {
-        if (e.data.size) answerChunksRef.current.push(e.data);
-      };
-      answerRecorderRef.current.start(250);
-      answerRecordingRef.current = true;
-      setRecordStatus("Listening…");
-      avatarRef.current?.setState("listening");
-    } catch (err) {
-      setRecordStatus(`Mic error: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  };
-
-  const stopAnswerRecording = async () => {
-    if (!answerRecordingRef.current || !answerRecorderRef.current) return;
-    answerRecordingRef.current = false;
-    answerBusyRef.current = true;
-    setRecordStatus("Uploading to /stt…");
-    try {
-      await new Promise<void>((resolve) => {
-        const rec = answerRecorderRef.current!;
-        rec.onstop = () => resolve();
-        if (rec.state !== "inactive") rec.stop();
-        else resolve();
-      });
-      answerStreamRef.current?.getTracks().forEach((t) => t.stop());
-      const type = answerRecorderRef.current.mimeType || "audio/webm";
-      const ext = type.includes("mp4") ? "mp4" : type.includes("ogg") ? "ogg" : "webm";
-      const blob = new Blob(answerChunksRef.current, { type });
-      const form = new FormData();
-      form.append("audio", blob, `answer.${ext}`);
-      form.append("lang", "en");
-      api.setBaseUrl(middlewareUrl);
-      const sttData = await api.stt(form);
-      setRecordStatus(`Heard: ${sttData.text || "(empty)"}`);
-      const payload: SessionInputPayload = { source: "stt", text: sttData.text };
-      if (sttData.normalized === "yes" || sttData.normalized === "no") {
-        payload.choice = sttData.normalized;
-      }
-      if (sttData.digits) payload.phone_digits = sttData.digits;
-      await sendInput(payload);
-    } catch (err) {
-      setRecordStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      answerBusyRef.current = false;
-      answerRecorderRef.current = null;
-      answerChunksRef.current = [];
-    }
-  };
+  const formHref = display?.checkinUrl
+    ? display.checkinUrl.replace(/^https?:\/\/[^/]+/, "")
+    : `/checkin?gate=${encodeURIComponent(gateId.trim() || "gate-1")}`;
 
   return (
     <main className="app-shell mx-auto max-w-[1280px] p-5">
@@ -368,11 +222,10 @@ export function ConsoleApp() {
       <header className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-semibold">
-            Smart Gate — Voice Console
+            Smart Gate — QR Check-in Console
           </h1>
           <p className="text-sm text-[var(--muted)]">
-            Approach A: LPR + SAP → avatar TTS/STT → queue notify → WhatsApp
-            confirm
+            Approach B: LPR + SAP → QR form → queue notify → WhatsApp confirm
           </p>
         </div>
         <StatusDot connected={connected} label={connLabel} />
@@ -398,11 +251,13 @@ export function ConsoleApp() {
             onClick={async () => {
               api.setBaseUrl(middlewareUrl.trim());
               const r = await api.resetDemo();
-              setSession(null);
-              lastSpokenPromptRef.current = "";
+              setDisplay(null);
+              setQrDataUrl(null);
               setActiveClaims([]);
               setConfigStatus(`Reset OK — deleted ${r.deleted} keys`);
               await refreshAll();
+              const d = await api.checkinDisplay(gateId.trim() || "gate-1");
+              await applyDisplay(d);
             }}
           >
             Reset demo run
@@ -416,10 +271,22 @@ export function ConsoleApp() {
 
       <div className="mb-4 grid gap-4 md:grid-cols-2">
         <HudPanel title="2 · SAP profile (register before LPR)">
-          <HudInput label="Client name" value={sapName} onChange={(e) => setSapName(e.target.value)} />
+          <HudInput
+            label="Client name"
+            value={sapName}
+            onChange={(e) => setSapName(e.target.value)}
+          />
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <HudInput label="Phone" value={sapPhone} onChange={(e) => setSapPhone(e.target.value)} />
-            <HudInput label="Plate" value={sapPlate} onChange={(e) => setSapPlate(e.target.value)} />
+            <HudInput
+              label="Phone"
+              value={sapPhone}
+              onChange={(e) => setSapPhone(e.target.value)}
+            />
+            <HudInput
+              label="Plate"
+              value={sapPlate}
+              onChange={(e) => setSapPlate(e.target.value)}
+            />
           </div>
           <div className="mt-3">
             <GlowButton
@@ -431,7 +298,9 @@ export function ConsoleApp() {
                   name: sapName.trim(),
                   phone: sapPhone.trim(),
                 });
-                setSapStatus(`Saved: ${profile.name} / ${profile.plate} / ${profile.phone}`);
+                setSapStatus(
+                  `Saved: ${profile.name} / ${profile.plate} / ${profile.phone}`,
+                );
                 setLprPlate(profile.plate);
               }}
             >
@@ -442,11 +311,14 @@ export function ConsoleApp() {
         </HudPanel>
 
         <HudPanel title="3 · LPR camera (simulate plate read)">
-          <HudInput label="Plate number" value={lprPlate} onChange={(e) => setLprPlate(e.target.value)} />
+          <HudInput
+            label="Plate number"
+            value={lprPlate}
+            onChange={(e) => setLprPlate(e.target.value)}
+          />
           <div className="mt-3 flex flex-wrap gap-2">
             <GlowButton
               onClick={async () => {
-                lastSpokenPromptRef.current = "";
                 api.setBaseUrl(middlewareUrl.trim());
                 if (!api.getSocket()?.connected) await connect();
                 else api.joinGate(gateId.trim() || "gate-1");
@@ -456,7 +328,7 @@ export function ConsoleApp() {
                 });
                 setLprStatus(
                   result.accepted
-                    ? `Accepted plate ${result.plateNumber} — waiting for SAP → session push…`
+                    ? `Accepted plate ${result.plateNumber} — waiting for SAP → check-in QR…`
                     : `Rejected: ${result.reason || "deduped"} (reset demo if plate still active)`,
                 );
                 setTimeout(() => void refreshAll(), 400);
@@ -464,7 +336,10 @@ export function ConsoleApp() {
             >
               Send plate read
             </GlowButton>
-            <GlowButton variant="secondary" onClick={() => setLprPlate(sapPlate.trim())}>
+            <GlowButton
+              variant="secondary"
+              onClick={() => setLprPlate(sapPlate.trim())}
+            >
               Copy from SAP plate
             </GlowButton>
           </div>
@@ -472,89 +347,56 @@ export function ConsoleApp() {
         </HudPanel>
       </div>
 
-      <div className="mb-4 grid gap-4 lg:grid-cols-[280px_1fr_1fr]">
-        <HudPanel title="4 · Avatar">
-          <KioskAvatar ref={avatarRef} size={260} onStatusChange={setAvatarStatus} />
-          <p className="status-mono mt-2">{avatarStatus}</p>
-          <audio ref={audioRef} className="hidden" />
-        </HudPanel>
-
-        <HudPanel title="5 · Visit session">
-          {session?.profile?.name ? (
-            <div className="mb-3 border-l-[3px] border-[var(--accent)] bg-[rgba(0,180,255,0.08)] p-3">
-              <div className="font-semibold">{session.profile.name}</div>
-              <div>Plate: {session.profile.plate ?? "—"}</div>
-              <div>Phone: {session.profile.phone ?? "—"}</div>
-            </div>
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <HudPanel title="4 · Check-in QR (kiosk preview)">
+          {display?.mode === "sap" && display.customerName ? (
+            <p className="mb-3 text-xl font-semibold">
+              Welcome, {display.customerName}
+            </p>
           ) : null}
-          <p className="min-h-12 text-[var(--foreground)]">
-            {session?.prompt ?? "Save SAP profile → send LPR plate → avatar greets."}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <GlowButton
-              variant="ok"
-              disabled={!awaitingYesNo}
-              onClick={() => void sendInput({ source: "touch", choice: "yes" })}
-            >
-              Yes
-            </GlowButton>
-            <GlowButton
-              variant="danger"
-              disabled={!awaitingYesNo}
-              onClick={() => void sendInput({ source: "touch", choice: "no" })}
-            >
-              No
-            </GlowButton>
-            <GlowButton
-              variant="secondary"
-              disabled={recordDisabled}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                void startAnswerRecording();
-              }}
-              onPointerUp={(e) => {
-                e.preventDefault();
-                void stopAnswerRecording();
-              }}
-              onPointerLeave={() => {
-                if (answerRecordingRef.current) void stopAnswerRecording();
-              }}
-              onClick={(e) => e.preventDefault()}
-            >
-              Hold to speak
-            </GlowButton>
-          </div>
-          {needPhone ? (
-            <div className="mt-3">
-              <HudInput
-                label="Visit phone"
-                value={phoneInput}
-                onChange={(e) => setPhoneInput(e.target.value)}
-                inputMode="numeric"
-              />
-              <Keypad
-                value={phoneInput}
-                onChange={setPhoneInput}
-                onSubmit={() => void sendInput({ source: "touch", phone_digits: phoneInput })}
-              />
-              <div className="mt-2 flex gap-2">
+          <div className="flex flex-wrap items-start gap-4">
+            <div className="rounded-xl bg-[#e8f4ff] p-3">
+              {qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrDataUrl} alt="Check-in QR" width={200} height={200} />
+              ) : (
+                <div className="flex h-[200px] w-[200px] items-center justify-center text-sm text-[var(--bg-deep)]">
+                  No QR yet
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="text-sm text-[var(--muted)]">
+                Mode: <strong>{display?.mode ?? "—"}</strong>
+                {display?.plateNumber ? ` · ${display.plateNumber}` : ""}
+              </p>
+              <p className="status-mono break-all text-[10px]">
+                {display?.checkinUrl ?? "Send an LPR plate or wait for generic QR."}
+              </p>
+              <div className="flex flex-wrap gap-2">
                 <GlowButton
                   variant="ok"
-                  onClick={() => void sendInput({ source: "touch", phone_digits: phoneInput })}
+                  onClick={() => {
+                    window.open(formHref, "_blank", "noopener,noreferrer");
+                  }}
                 >
-                  Submit number
+                  Open check-in form
                 </GlowButton>
-                <GlowButton variant="secondary" onClick={() => setPhoneInput("")}>
-                  Clear
+                <GlowButton
+                  variant="secondary"
+                  onClick={async () => {
+                    const d = await api.checkinDisplay(gateId.trim() || "gate-1");
+                    await applyDisplay(d);
+                  }}
+                >
+                  Refresh display
                 </GlowButton>
               </div>
             </div>
-          ) : null}
-          {sessionStatus ? <p className="status-mono mt-2">{sessionStatus}</p> : null}
-          {recordStatus ? <p className="status-mono mt-1">{recordStatus}</p> : null}
+          </div>
         </HudPanel>
 
-        <HudPanel title="6 · Queue & notify">
+        <HudPanel title="5 · Queue & notify">
           <HudInput
             label="Available free slots"
             type="number"
@@ -596,8 +438,12 @@ export function ConsoleApp() {
                 <span className="rounded-md border border-[var(--accent)] px-2 py-1 text-[var(--accent)]">
                   WhatsApp
                 </span>
-                <span className="rounded-md border border-[var(--border)] px-2 py-1">SMS</span>
-                <span className="rounded-md border border-[var(--border)] px-2 py-1">Toyota App</span>
+                <span className="rounded-md border border-[var(--border)] px-2 py-1">
+                  SMS
+                </span>
+                <span className="rounded-md border border-[var(--border)] px-2 py-1">
+                  Toyota App
+                </span>
               </div>
               {activeClaims.map((c) => (
                 <div
@@ -620,7 +466,9 @@ export function ConsoleApp() {
                         slotId: c.slotId,
                         plateNumber: c.plateNumber,
                       });
-                      setNotifyStatus(`Confirmed ${c.plateNumber} — assigning slot…`);
+                      setNotifyStatus(
+                        `Confirmed ${c.plateNumber} — assigning slot…`,
+                      );
                       setTimeout(() => void refreshAll(), 400);
                     }}
                   >
@@ -670,7 +518,7 @@ export function ConsoleApp() {
         </HudPanel>
       </div>
 
-      <HudPanel title="7 · Event timeline (the talking)">
+      <HudPanel title="6 · Event timeline">
         <div className="flex max-h-[360px] flex-col gap-2 overflow-auto">
           {timeline.length ? (
             timeline.map((e) => {
@@ -678,13 +526,16 @@ export function ConsoleApp() {
                 typeof e.payload === "string"
                   ? e.payload
                   : JSON.stringify(e.payload ?? {});
-              const short = payload.length > 160 ? payload.slice(0, 160) + "…" : payload;
+              const short =
+                payload.length > 160 ? payload.slice(0, 160) + "…" : payload;
               return (
                 <div
                   key={e.id ?? `${e.event}-${e.at}`}
                   className="rounded-lg border-l-[3px] border-[var(--border)] bg-black/20 p-2 text-sm"
                 >
-                  <div className="font-semibold text-[var(--accent)]">{e.event}</div>
+                  <div className="font-semibold text-[var(--accent)]">
+                    {e.event}
+                  </div>
                   <div className="status-mono text-xs">
                     {e.at} · {e.id}
                   </div>
@@ -693,7 +544,9 @@ export function ConsoleApp() {
               );
             })
           ) : (
-            <div className="status-mono">Events appear here as the flow runs…</div>
+            <div className="status-mono">
+              Events appear here as the flow runs…
+            </div>
           )}
         </div>
       </HudPanel>

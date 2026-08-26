@@ -23,6 +23,7 @@ export class GateService {
     this.logger.setContext(GateService.name);
   }
 
+  /** Voice console path — open on identity confirm / phone capture. */
   @OnEvent(DomainEvents.KioskIdentityConfirmed)
   async onIdentityConfirmed(
     payload: KioskIdentityConfirmedPayload,
@@ -35,9 +36,13 @@ export class GateService {
     await this.openForVisit(payload);
   }
 
-  private async openForVisit(
-    payload: KioskIdentityConfirmedPayload | KioskPhoneCapturedPayload,
-  ): Promise<void> {
+  /** Shared open — also called by check-in after rate-limit acquire. */
+  async openForVisit(payload: {
+    gateId: string;
+    sessionId: string;
+    plateNumber: string;
+    correlationId?: string;
+  }): Promise<void> {
     const gatePayload: GateEventPayload = {
       gateId: payload.gateId,
       sessionId: payload.sessionId,
@@ -56,6 +61,10 @@ export class GateService {
         plateNumber: payload.plateNumber,
       },
       payload.correlationId,
+    );
+    this.logger.info(
+      { gateId: payload.gateId, plateNumber: payload.plateNumber },
+      'gate.opened',
     );
   }
 }

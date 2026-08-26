@@ -6,6 +6,7 @@ import type { Env } from '../../config/env.validation';
 import type { ClientProfile } from '../../events/domain-events';
 import { REDIS_CLIENT } from '../../redis/redis.constants';
 import { AuditService } from '../audit/audit.service';
+import { CheckinService } from '../checkin/checkin.service';
 import { SessionStore } from '../kiosk/session.store';
 import { LprService } from '../lpr/lpr.service';
 import { QueueRepository } from '../queue-engine/queue.repository';
@@ -23,6 +24,7 @@ export class DemoService {
     private readonly lprService: LprService,
     private readonly auditService: AuditService,
     private readonly ttsService: TtsService,
+    private readonly checkinService: CheckinService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(DemoService.name);
@@ -61,6 +63,7 @@ export class DemoService {
     deleted += await this.queueRepo.purge();
     deleted += await this.sessionStore.purge();
     deleted += await this.lprService.purge();
+    deleted += await this.checkinService.purge();
     deleted += await this.auditService.purge();
     deleted += await this.ttsService.purge();
     deleted += await this.purgeDemoSapKeys();

@@ -130,29 +130,52 @@ export class QueueEngineService {
   async onIdentityConfirmed(
     payload: KioskIdentityConfirmedPayload,
   ): Promise<void> {
-    await this.enqueueVisit(payload);
-  }
-
-  @OnEvent(DomainEvents.KioskPhoneCaptured)
-  async onPhoneCaptured(payload: KioskPhoneCapturedPayload): Promise<void> {
-    await this.enqueueVisit(payload);
-  }
-
-  private async enqueueVisit(
-    payload: KioskIdentityConfirmedPayload | KioskPhoneCapturedPayload,
-  ): Promise<void> {
-    const { created, entry } = await this.repo.enqueue({
+    await this.enqueueFromCheckin({
       plateNumber: payload.plateNumber,
       phone: payload.visitPhone,
       gateId: payload.gateId,
       sessionId: payload.sessionId,
+      correlationId: payload.correlationId,
+    });
+  }
+
+  @OnEvent(DomainEvents.KioskPhoneCaptured)
+  async onPhoneCaptured(payload: KioskPhoneCapturedPayload): Promise<void> {
+    await this.enqueueFromCheckin({
+      plateNumber: payload.plateNumber,
+      phone: payload.visitPhone,
+      gateId: payload.gateId,
+      sessionId: payload.sessionId,
+      correlationId: payload.correlationId,
+    });
+  }
+
+  /**
+   * Enqueue a visit from check-in (or legacy kiosk confirm).
+   * Returns created=false when the plate is already waiting (idempotent).
+   */
+  async enqueueFromCheckin(params: {
+    plateNumber: string;
+    phone: string;
+    gateId: string;
+    sessionId: string;
+    correlationId?: string;
+  }): Promise<{
+    created: boolean;
+    entry: Awaited<ReturnType<QueueRepository['enqueue']>>['entry'];
+  }> {
+    const { created, entry } = await this.repo.enqueue({
+      plateNumber: params.plateNumber,
+      phone: params.phone,
+      gateId: params.gateId,
+      sessionId: params.sessionId,
     });
     if (!created) {
       this.logger.info(
-        { entryId: entry.id, plate: payload.plateNumber },
+        { entryId: entry.id, plate: params.plateNumber },
         'queue.enqueue.idempotent_skip',
       );
-      return;
+      return { created, entry };
     }
     const enqueued: QueueEnqueuedPayload = {
       entryId: entry.id,
@@ -161,7 +184,7 @@ export class QueueEngineService {
       gateId: entry.gateId,
       sessionId: entry.sessionId,
       enqueuedAt: entry.enqueuedAt,
-      correlationId: payload.correlationId,
+      correlationId: params.correlationId,
     };
     this.events.emit(DomainEvents.QueueEnqueued, enqueued);
     await this.lpr.markActive(
@@ -169,6 +192,7 @@ export class QueueEngineService {
       entry.gateId,
       'queue_enqueued',
     );
+    return { created, entry };
   }
 
   @OnEvent(DomainEvents.QueueClaimConfirmed)

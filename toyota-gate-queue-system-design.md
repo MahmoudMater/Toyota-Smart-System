@@ -1,6 +1,6 @@
 # Toyota Smart Gate & Queue Management System — Solution Design
 
-**Scope:** single branch, multiple entry gates (each with LPR camera + kiosk/avatar), one shared queue, one middleware. Exit flow and multi-branch scale are out of scope for this version.
+**Scope:** single branch, multiple entry gates (each with LPR camera + kiosk display), one shared queue, one middleware. Exit flow and multi-branch scale are out of scope for this version. Module 1 supports **two presentable approaches**: voice/avatar (Approach A) and QR check-in (Approach B).
 
 ---
 
@@ -9,9 +9,10 @@
 | Component | Role |
 |---|---|
 | **LPR Camera** (one per gate) | Reads the plate as a car approaches, sends the plate number to the middleware. |
-| **Kiosk / Avatar device** (one per gate, Android) | Voice-driven bot UI. Displays client info, asks for confirmation, talks in English. |
+| **Kiosk display** (one per gate) | Approach A: voice-driven avatar UI. Approach B: large QR + Welcome name + status. |
+| **Driver phone** | Opens the public `/checkin` form from a QR (Approach B). |
 | **Gate controller** | Physical barrier. Opens on command from the middleware. |
-| **Middleware** | The brain. Talks to every gate, talks to SAB, owns the queue, owns notifications. This is the one component that must handle concurrency across N gates safely. |
+| **Middleware** | The brain. Talks to every gate, talks to SAB, owns check-in tickets and voice sessions, owns the queue, owns notifications. |
 | **SAB** | Toyota's existing client database. Exposed to the middleware via API (read: lookup by plate; the exact contract is external/pre-existing). |
 | **Slot Availability System** | A separate existing system that tells the middleware how many garage slots are currently free (assumed to expose an API/webhook — see Open Questions). |
 | **Queue Engine** | The single shared FIFO-with-skip queue described in Module 2. |
@@ -19,7 +20,7 @@
 
 ---
 
-## 2. Module 1 — Avatar / AI Agent (Gate Entry Flow)
+## 2. Module 1 — Gate entry (Approach A — Avatar / AI Agent)
 
 ### 2.1 Plate found in SAB (known client)
 
@@ -55,6 +56,25 @@
 | Client keeps saying "that's not my number" past a few retries | Loop is capped at a few attempts, then the ops dashboard is alerted so staff can step in — same as before. |
 | SAB unreachable | Gate stays closed, per your existing rule for SAB/middleware failures. |
 | Kiosk network drop mid-flow | Kiosk caches the session locally and retries; if it can't reach the middleware within a timeout, it shows a "please wait, calling staff" fallback. |
+
+### 2.4 Approach B — QR check-in
+
+An alternate Module 1 path for the same LPR → SAB → enqueue → Module 2 claim story. Useful when voice hardware or latency is undesirable, or as a parallel demo.
+
+**Path A — Generic QR (always on):** Printed or idle kiosk shows `https://{public}/checkin?gate={gateId}`. Empty form; driver types plate, name, phone. Submit → enqueue + open **that** gate (subject to rate limit).
+
+**Path B — LPR + SAB miss:** Middleware mints an opaque Redis token (TTL ~3 minutes, single use). Kiosk swaps to a token URL. Form prefills **plate only** (editable). Name and phone empty.
+
+**Path C — LPR + SAB hit:** Same token mint with `plateLocked: true`, name + phone prefilled (editable). Kiosk shows `Welcome, {name}` + QR (no phone on the glass).
+
+Settled rules for Approach B:
+
+- Gate opens on **successful new-plate submit**, not on LPR alone.
+- **At most one gate-open per gate per ~30s**. Extra new plates still enqueue; they do not fire another open until the window passes.
+- Duplicate plate already waiting → reject (no second entry, do not open again).
+- Edited name/phone are **visit-only** — no SAB write-back.
+- Token never embeds PII; phone loads `/checkin?gate=…&t=…` then `GET`s the ticket over HTTPS.
+- After enqueue, Module 2 (slot free → WhatsApp/SMS/app claim) is **unchanged**.
 
 ---
 

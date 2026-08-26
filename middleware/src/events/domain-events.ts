@@ -7,6 +7,8 @@ export const DomainEvents = {
   KioskIdentityConfirmed: 'kiosk.identity.confirmed',
   KioskPhoneCaptured: 'kiosk.phone.captured',
   KioskStaffEscalation: 'kiosk.staff.escalation',
+  CheckinSubmitted: 'checkin.submitted',
+  CheckinDisplayUpdated: 'checkin.display.updated',
   GateOpenCommanded: 'gate.open.commanded',
   GateOpened: 'gate.opened',
   QueueEnqueued: 'queue.enqueued',
@@ -80,6 +82,27 @@ export interface KioskStaffEscalationPayload extends BaseDomainPayload {
   gateId: string;
   plateNumber: string;
   reason: string;
+}
+
+export type CheckinDisplayMode = 'generic' | 'lpr' | 'sap' | 'submitted';
+
+export interface CheckinDisplayPayload extends BaseDomainPayload {
+  mode: CheckinDisplayMode;
+  gateId: string;
+  checkinUrl: string;
+  customerName?: string;
+  plateNumber?: string;
+  expiresAt?: string;
+  token?: string;
+}
+
+export interface CheckinSubmittedPayload extends BaseDomainPayload {
+  sessionId: string;
+  gateId: string;
+  plateNumber: string;
+  visitPhone: string;
+  profile: ClientProfile;
+  gateOpened: boolean;
 }
 
 export interface GateEventPayload extends BaseDomainPayload {
@@ -157,6 +180,8 @@ export interface DomainEventMap {
   [DomainEvents.KioskIdentityConfirmed]: KioskIdentityConfirmedPayload;
   [DomainEvents.KioskPhoneCaptured]: KioskPhoneCapturedPayload;
   [DomainEvents.KioskStaffEscalation]: KioskStaffEscalationPayload;
+  [DomainEvents.CheckinSubmitted]: CheckinSubmittedPayload;
+  [DomainEvents.CheckinDisplayUpdated]: CheckinDisplayPayload;
   [DomainEvents.GateOpenCommanded]: GateEventPayload;
   [DomainEvents.GateOpened]: GateEventPayload;
   [DomainEvents.QueueEnqueued]: QueueEnqueuedPayload;

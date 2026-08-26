@@ -1,0 +1,21 @@
+stateDiagram-v2
+    [*] --> GenericQR: Kiosk idle / after submit or expiry
+
+    GenericQR --> MintSap: sap.lookup.found
+    GenericQR --> MintLpr: sap.lookup.not_found
+
+    MintSap --> ActiveTicket: Redis checkin:ticket + gate key EX 180s\nplateLocked=true name+phone filled
+    MintLpr --> ActiveTicket: Redis ticket EX 180s\nplateLocked=false plate only
+
+    ActiveTicket --> PhoneLoads: Phone opens /checkin?gate=&t=
+    PhoneLoads --> Prefill: GET /checkin/tickets/:token 200
+    PhoneLoads --> ExpiredFallback: GET 410 Gone
+
+    Prefill --> Submitted: POST /checkin/submit success
+    Submitted --> GenericQR: Consume token; push submitted then generic
+
+    ExpiredFallback --> GenericForm: Drop to generic form for gate\nkeep plate hint if LPR still live
+    GenericForm --> Submitted: Submit without token
+
+    ActiveTicket --> GenericQR: TTL expires / single-use consumed
+    ActiveTicket --> ActiveTicket: New LPR at same gate replaces prior token

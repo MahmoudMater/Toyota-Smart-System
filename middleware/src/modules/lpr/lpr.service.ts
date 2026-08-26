@@ -11,11 +11,15 @@ const ACTIVE_SESSION_KEY = (plate: string) =>
   `lpr:active:${plate.trim().toUpperCase().replace(/\s+/g, '')}`;
 
 export type PlateActiveReason =
-  'lpr_dedupe' | 'kiosk_session' | 'queue_enqueued';
+  | 'lpr_dedupe'
+  | 'kiosk_session'
+  | 'checkin_pending'
+  | 'queue_enqueued';
 
 const TTL_BY_REASON: Record<PlateActiveReason, number> = {
   lpr_dedupe: 120,
   kiosk_session: 3600,
+  checkin_pending: 180,
   queue_enqueued: 86_400,
 };
 

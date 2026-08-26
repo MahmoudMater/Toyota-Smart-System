@@ -17,7 +17,8 @@
 5. [Design patterns — adapter ports](#5-design-patterns--adapter-ports)
 6. [Web UIs](#6-web-uis)
 7. [Real-time communication — Socket.io](#7-real-time-communication--socketio)
-8. [Kiosk conversation approach](#8-kiosk-conversation-approach)
+8. [Approach A — Kiosk conversation (voice)](#8-approach-a--kiosk-conversation-voice)
+8b. [Approach B — QR check-in](#8b-approach-b--qr-check-in)
 9. [Voice pipeline — STT, NLU, TTS, avatar sync](#9-voice-pipeline--stt-nlu-tts-avatar-sync)
 10. [Queue engine](#10-queue-engine)
 11. [Integrations status](#11-integrations-status)
@@ -34,7 +35,7 @@
 
 ### The problem
 
-At a Toyota service branch, cars queue at entry gates while staff manually verify identity. Plate recognition exists, but there is no conversational confirmation with the driver. Garage slot availability is opaque — drivers enter without knowing when a slot will free up, and no-shows waste capacity.
+At a Toyota service branch, cars queue at entry gates while staff manually verify identity. Plate recognition exists, but there is no reliable confirmation with the driver. Garage slot availability is opaque — drivers enter without knowing when a slot will free up, and no-shows waste capacity.
 
 ### The solution
 
@@ -42,26 +43,31 @@ At a Toyota service branch, cars queue at entry gates while staff manually verif
 
 | Module | Role |
 |--------|------|
-| **Module 1 — Kiosk AI Agent** | Voice avatar at each gate confirms identity after LPR + SAP lookup, captures a visit phone when the driver is not the account holder, opens the gate, and enqueues the visit |
+| **Module 1 — Gate entry (dual approach)** | After LPR + SAP lookup, the driver confirms via **Approach A (voice avatar)** or **Approach B (QR check-in form)**. Either path opens the gate (with Approach B rate limits) and enqueues the visit |
 | **Module 2 — Queue Management** | Single shared FIFO queue across all gates; when a garage slot frees, notify the next driver via WhatsApp (authoritative), SMS, and app push, with a **50-second claim window** and **growing push-back** on no-shows |
+
+**Approach A — Voice / avatar:** Kiosk greets by name, confirms on-file phone by TTS/STT or touch, captures a visit phone when needed.  
+**Approach B — QR check-in:** Kiosk shows a large QR (generic always-on, or a 3-minute opaque token after LPR/SAP). The driver submits plate / name / phone on a mobile form. PII never sits in the QR URL.
 
 ### Phase 1 scope
 
-- **In scope:** Single branch, multiple entry gates, one shared queue, entry flow only
+- **In scope:** Single branch, multiple entry gates, one shared queue, entry flow only, dual demo of voice and QR
 - **Out of scope:** Exit flow, multi-branch scale, Arabic voice (scaffolded but disabled), production hardware integrations not yet contracted
 
 ### What this delivery includes
 
 A **demo-ready NestJS middleware prototype** with:
 
-- Full kiosk session state machine (voice + touch)
-- Shared queue engine with BullMQ claim timers
-- Three browser UIs in Next.js (`web/`) — kiosk, demo console, integration logs
-- ElevenLabs STT/TTS integration (live)
+- Dual Module 1 paths: voice session state machine **and** Redis-backed QR check-in tickets
+- Shared queue engine with BullMQ claim timers (unchanged between approaches)
+- Next.js UIs (`web/`) — QR kiosk, Voice Console, QR Console, mobile check-in form, integration logs
+- ElevenLabs STT/TTS for Approach A (live)
 - Stub adapters for SAP, gate, and WhatsApp so local development proceeds before vendor API schemas arrive
-- End-to-end proof script and unit tests
+- End-to-end proof script (`prove_flow.sh` via check-in submit) and unit tests
 
 ![System context](diagrams/01-system-context.png)
+
+![Dual entry approaches](diagrams/11-dual-entry-approaches.png)
 
 ---
 
@@ -72,9 +78,10 @@ A **demo-ready NestJS middleware prototype** with:
 | Actor / system | Role |
 |----------------|------|
 | **LPR camera** (one per gate) | Reads plate as car approaches; sends plate to middleware |
-| **Kiosk / avatar** (one per gate) | Voice-driven UI; displays client info, asks for confirmation |
+| **Kiosk display** (one per gate) | Approach A: voice avatar UI. Approach B: QR + Welcome name + status |
+| **Driver phone** | Opens `/checkin` form from QR (Approach B) |
 | **Gate controller** | Physical barrier; opens on middleware command |
-| **Middleware** | Central brain — orchestrates all gates, owns the queue, drives notifications |
+| **Middleware** | Central brain — orchestrates all gates, owns check-in tickets + voice sessions, owns the queue, drives notifications |
 | **SAP / SAB** | Toyota customer database — lookup by plate (read-only from middleware) |
 | **Slot availability system** | Reports when garage slots become free |
 | **Notification service** | WhatsApp (claim source of truth), SMS, Toyota app push (informational) |
@@ -83,31 +90,38 @@ A **demo-ready NestJS middleware prototype** with:
 
 | Rule | Behaviour |
 |------|-----------|
-| Plate **not found** in SAP | Gate stays **closed** — no guest flow |
+| Plate **not found** in SAP (Approach A) | Avatar shows not recognized; voice path does not open the gate |
+| Plate **not found** in SAP (Approach B) | Mint LPR ticket (plate prefilled, editable); driver completes name/phone on form; submit can enqueue + open |
 | SAP / middleware **unreachable** | Gate stays **closed** |
-| Driver says phone on file is **wrong** | Ask if owner; if yes, collect visit phone by voice; **visit phone does not overwrite SAP record** |
+| Driver says phone on file is **wrong** (Approach A) | Ask if owner; if yes, collect visit phone by voice; **visit phone does not overwrite SAP record** |
+| Edited name/phone on check-in form (Approach B) | **Visit-only** — no SAP write-back |
+| Gate open (Approach B) | On **successful new-plate submit** only; **at most one open per gate per ~30s**; extras still enqueue |
+| Duplicate plate already waiting | **409** already queued — no second entry, no open |
+| Check-in token | Opaque Redis id, **TTL 180s**, **single use**, bound to gate + plate |
 | **WhatsApp confirm** within 50s | Slot assigned; confirmation treated as guaranteed arrival |
 | **Timeout** on claim | Entry pushed back N positions (N grows with consecutive misses); next FIFO head notified |
 | **Retry ceiling** on queue | None — client cycles indefinitely if they keep missing notifications |
-| **Staff escalation** | After 3 unclear retries in kiosk conversation |
+| **Staff escalation** (Approach A) | After 3 unclear retries in kiosk conversation |
 
-![End-to-end flow](diagrams/03-end-to-end-flow.png)
+![End-to-end flow Approach A](diagrams/03-end-to-end-flow.png)
+
+![QR check-in sequence Approach B](diagrams/12-qr-checkin-sequence.png)
 
 ---
 
 ## 3. What has been delivered
 
-Work completed August 9–11, 2026 (see [`releases.md`](../../releases.md) for full changelog).
+Work completed August 2026 (see [`releases.md`](../../releases.md) for full changelog). Dual entry approaches are demo-ready for client presentation.
 
 ### A. Middleware core
 
-- NestJS modular monolith: LPR, SAP, Gate, Kiosk, Queue Engine, Notifications, Audit, Demo, TTS, STT, NLU, Integration Log
-- Redis for live state (sessions, queue, TTS cache, audit stream, LPR dedupe)
+- NestJS modular monolith: LPR, SAP, Checkin, Gate, Kiosk, Queue Engine, Notifications, Audit, Demo, TTS, STT, NLU, Integration Log
+- Redis for live state (sessions, check-in tickets, queue, TTS cache, audit stream, LPR dedupe)
 - BullMQ delayed jobs for 50s claim timers
 - Domain event bus (`@nestjs/event-emitter`) with typed payloads and audit trail
 - Correlation IDs via `x-correlation-id` header
 
-### B. Kiosk session engine
+### B. Kiosk session engine (Approach A)
 
 - Explicit state machine — not a free-form LLM conversational agent
 - States: identity confirm → owner check → phone speech → phone confirm → done / staff escalation / not recognized
@@ -121,8 +135,9 @@ Work completed August 9–11, 2026 (see [`releases.md`](../../releases.md) for f
 - Growing push-back on consecutive no-shows per slot cycle
 - Multi-slot parallel notify via batch free endpoint
 - WhatsApp confirm HTTP endpoint (stub notification adapter for demos)
+- Shared by both Approach A and Approach B after enqueue
 
-### D. Voice stack (ElevenLabs)
+### D. Voice stack (ElevenLabs) — Approach A
 
 - STT via ElevenLabs Scribe (`scribe_v2`)
 - TTS via ElevenLabs v3 (`eleven_v3`) with audio tags and 3-3-4 digit read-out
@@ -130,7 +145,7 @@ Work completed August 9–11, 2026 (see [`releases.md`](../../releases.md) for f
 - Retry with exponential backoff on ElevenLabs 429/5xx
 - Stub adapters for offline demo without API key
 
-### E. NLU (transcript interpretation)
+### E. NLU (transcript interpretation) — Approach A
 
 - Rules-first hybrid: yes/no and clean phone digits handled instantly
 - Optional local LLM (Ollama `qwen3:0.6b`) for messy digit speech only
@@ -138,11 +153,13 @@ Work completed August 9–11, 2026 (see [`releases.md`](../../releases.md) for f
 - EG/SA phone validation
 - Read-back confirm step is the accuracy safety net
 
-### F. Web UIs
+### F. Web UIs (Next.js on `:3001`)
 
-- **Kiosk** (`index.html`) — avatar, voice capture, touch keypad, STT/TTS sandbox
-- **Demo console** (`web/app/console`) — full operator workflow with audit timeline
-- **Integration logs** (`web/app/logs`) — live tail of external API calls
+- **QR kiosk** (`/`) — large QR, Welcome name, status (Approach B glass)
+- **Voice Console** (`/console`) — avatar TTS/STT operator demo (Approach A)
+- **QR Console** (`/console/qr`) — live check-in URL/QR + open form (Approach B)
+- **Check-in form** (`/checkin`) — mobile plate / name / phone submit
+- **Integration logs** (`/logs`) — live tail of external API calls
 
 ### G. Integration logging
 
@@ -152,16 +169,26 @@ Work completed August 9–11, 2026 (see [`releases.md`](../../releases.md) for f
 
 ### H. Tests and proof
 
-- Unit tests: state machine, queue logic, TTS/STT/NLU specs (19+ tests)
-- `scripts/prove_flow.sh` — curl-based end-to-end proof without browser
+- Unit tests: state machine, queue logic, check-in plate-lock helpers, TTS/STT/NLU specs
+- `scripts/prove_flow.sh` — LPR → check-in display/ticket → `POST /checkin/submit` → queue → slot → WhatsApp
+
+### I. Check-in module (Approach B)
+
+- Opaque Redis tickets (`checkin:ticket:{token}`, TTL 180s), gate current ticket, plate hint, gate-open rate limit key
+- HTTP: `GET /checkin/display/:gateId`, `GET /checkin/tickets/:token`, `POST /checkin/submit`
+- Events: `checkin.submitted`, `checkin.display.updated`
+- Socket push `checkin.display` on join and mint/submit
+- Env: `CHECKIN_PUBLIC_BASE_URL`, `CHECKIN_TOKEN_TTL_SECONDS`, `GATE_OPEN_RATE_LIMIT_SECONDS`
 
 ---
 
 ## 4. Architecture overview
 
-The middleware is a **modular monolith**: one Node.js process serves REST, WebSocket, and static HTML. Modules communicate via **domain events** rather than direct tight coupling.
+The middleware is a **modular monolith**: one Node.js process serves REST and WebSocket. The **Next.js** app (`web/`) is a separate process on port **3001**. Modules communicate via **domain events** rather than direct tight coupling. On SAP found/miss the middleware **dual-emits**: mint a check-in ticket (Approach B) **and** start/update a voice session (Approach A) so both demos work.
 
 ![Container diagram](diagrams/02-containers.png)
+
+![Dual entry approaches](diagrams/11-dual-entry-approaches.png)
 
 ### NestJS modules
 
@@ -169,12 +196,13 @@ The middleware is a **modular monolith**: one Node.js process serves REST, WebSo
 |--------|----------------|
 | `lpr` | Ingest plate reads, dedupe active plates, emit `lpr.plate.read` |
 | `sap` | Lookup client profile by plate on LPR event |
-| `kiosk` | Session state machine, Redis store, Socket.io push |
-| `gate` | Open gate on identity/phone confirmed |
-| `queue-engine` | FIFO queue, slot notify, claim timers, shift-back |
+| `checkin` | Opaque tickets, public form APIs, rate-limited gate open, display push |
+| `kiosk` | Session state machine, Redis store, Socket.io session push (+ wires SAP → check-in mint) |
+| `gate` | Open gate on voice confirm **or** check-in submit |
+| `queue-engine` | FIFO queue, slot notify, claim timers, shift-back; `enqueueFromCheckin` |
 | `notifications` | Send slot notifications; WhatsApp confirm endpoint |
 | `audit` | Append all domain events to Redis stream |
-| `demo` | Fake SAP overrides, full reset, config |
+| `demo` | Fake SAP overrides, full reset (includes `checkin:*`), config |
 | `tts` / `stt` / `nlu` / `speech` | Voice pipeline with adapter seams |
 | `integration-log` | Pretty file logs + live WebSocket viewer |
 
@@ -182,7 +210,7 @@ The middleware is a **modular monolith**: one Node.js process serves REST, WebSo
 
 | Store | Contents |
 |-------|----------|
-| **Redis** | Kiosk sessions, queue entries, LPR active-plate keys, TTS cache, audit stream, BullMQ backend |
+| **Redis** | Kiosk sessions, check-in tickets / gate display / open rate limit, queue entries, LPR active-plate keys, TTS cache, audit stream, BullMQ backend |
 | **Postgres** | Not implemented in this phase (design doc recommends it for durable audit history) |
 
 ---
@@ -242,34 +270,62 @@ Env vars: `STT_ADAPTER`, `TTS_ADAPTER`, `NLU_ADAPTER`.
 
 ## 6. Web UIs
 
-All UIs are **thin Next.js/React clients** in [`web/`](../../web/) (port **3001**). They call the NestJS middleware API (port **3000**) for REST and Socket.io. **All session logic lives on the server** — the browser handles presentation, TTS playback, STT capture, and Socket.io transport only.
+All UIs are **thin Next.js/React clients** in [`web/`](../../web/) (port **3001**). They call the NestJS middleware API (port **3000**) for REST and Socket.io. **Business logic lives on the server** — the browser handles presentation, QR rendering, TTS playback, STT capture, and Socket.io transport.
 
-Run the web app: `cd web && npm run dev` → http://127.0.0.1:3001
+| UI | URL | Approach |
+|----|-----|----------|
+| QR kiosk | http://127.0.0.1:3001/ | B — glass QR + Welcome |
+| Voice Console | http://127.0.0.1:3001/console | A — avatar TTS/STT |
+| QR Console | http://127.0.0.1:3001/console/qr | B — QR preview + open form |
+| Check-in form | http://127.0.0.1:3001/checkin?gate=gate-1 | B — mobile submit |
+| Integration logs | http://127.0.0.1:3001/logs | Shared |
 
-### 6.1 Regular kiosk UI
+Run the web app: `cd web && npm run dev` → http://127.0.0.1:3001  
+Middleware: `cd middleware && npm run start:dev` → http://127.0.0.1:3000
+
+### 6.1 QR kiosk UI
 
 | Path | Role |
 |------|------|
-| `app/page.tsx` + `features/kiosk/KioskApp.tsx` | Kiosk layout — avatar, session, STT/TTS sandboxes |
-| `components/avatar/KioskAvatar.tsx` | Avatar states (idle/talking/listening), canvas lip-sync from TTS audio RMS |
-| `lib/mw-api.ts` | HTTP + Socket.io wrapper to middleware |
+| `app/page.tsx` + `features/kiosk/KioskApp.tsx` | Large QR from `checkinUrl`, Welcome name on SAP mode, status line |
+| `lib/mw-api.ts` | HTTP + Socket.io (`checkin.display`) |
 
 **URL:** http://127.0.0.1:3001/
 
-Features: Start manual visit, Yes/No buttons, hold-to-record voice answers, phone keypad, TTS/STT test panels.
+Idle = generic `?gate=` QR. After LPR/SAP = token QR with optional Welcome name. After submit = brief submitted status then generic again.
 
-### 6.2 Demo console
+### 6.2 Voice Console (Approach A)
 
 | Path | Role |
 |------|------|
-| `app/console/page.tsx` + `features/console/ConsoleApp.tsx` | Operator layout — connection, SAP profile, LPR simulate, queue, slots |
-| `lib/mw-api.ts` | Shared HTTP + Socket.io API wrapper with localStorage config |
+| `app/console/page.tsx` + `features/console/ConsoleApp.tsx` | Connection, SAP, LPR, avatar, Yes/No, hold-to-speak, queue, WhatsApp |
+| `components/avatar/KioskAvatar.tsx` | Avatar lip-sync |
 
 **URL:** http://127.0.0.1:3001/console
 
-Operator workflow: Connect → Save SAP profile → Send LPR plate → interact with avatar → Free slot → WhatsApp confirm → watch audit timeline.
+Operator workflow: Connect → Save SAP → Send LPR → avatar greets → Yes / speak → Free slot → WhatsApp confirm → audit timeline.
 
-### 6.3 Integration logs UI
+### 6.3 QR Console (Approach B)
+
+| Path | Role |
+|------|------|
+| `app/console/qr/page.tsx` + `features/console/QrConsoleApp.tsx` | Same SAP/LPR/queue controls; shows live check-in QR + Open form |
+
+**URL:** http://127.0.0.1:3001/console/qr
+
+Operator workflow: Connect → Save SAP → Send LPR → QR appears → Open check-in form → Submit on phone → Free slot → WhatsApp confirm.
+
+### 6.4 Mobile check-in form
+
+| Path | Role |
+|------|------|
+| `app/checkin/page.tsx` + `features/checkin/CheckinForm.tsx` | Prefill from token; lock plate when `plateLocked`; 410 fallback; success / already-queued |
+
+**URL:** http://127.0.0.1:3001/checkin?gate=gate-1&t=TOKEN
+
+Talks to middleware via `createMwApi` (not Next server actions). Set `CHECKIN_PUBLIC_BASE_URL` to a phone-reachable absolute URL in a real lane (not `localhost`).
+
+### 6.5 Integration logs UI
 
 | Path | Role |
 |------|------|
@@ -278,31 +334,39 @@ Operator workflow: Connect → Save SAP profile → Send LPR plate → interact 
 
 **URL:** http://127.0.0.1:3001/logs
 
-Tracks: `elevenlabs`, `lpr`, `nlu`, `sap`, `gate`, `notifications`, `tts`, `stt`.
-
 ### UI design approach
 
-- **Server-driven prompts:** Each `session.update` carries `prompt` (screen text) and `speech` (ElevenLabs-optimized text with audio tags and spelled digits)
-- **Avatar sync:** Server sets `avatar_state`; client drives lip-sync during TTS playback via Web Audio API amplitude analysis
-- **Degraded fallback:** Touch keypad and Yes/No buttons work when STT fails or ElevenLabs is unavailable (with stub adapters)
+- **Approach A:** Server-driven `session.update` with `prompt` / `speech`; avatar lip-sync from TTS RMS; touch fallback when STT fails
+- **Approach B:** Server-driven `checkin.display` with `mode`, `checkinUrl`, `customerName`, `expiresAt`; client renders QR via `qrcode`
 
 ---
 
 ## 7. Real-time communication — Socket.io
 
-HTML clients connect to the **same origin** as the NestJS API (port 3000). Two WebSocket namespaces are used.
+Next.js clients connect to the NestJS API origin (port **3000**). Two WebSocket namespaces are used.
 
 ![Socket.io communication](diagrams/08-socket-html-backend.png)
 
-### Namespace `/kiosk` — session flow
+### Namespace `/kiosk` — dual display
 
 | Direction | Event | Payload | Notes |
 |-----------|-------|---------|-------|
-| Client → Server | `kiosk.join` | `{ gateId }` | Joins room `gate:{gateId}` |
-| Server → Client | `session.update` | `PublicSession` | Broadcast to gate room |
-| Client → Server | `session.input` | `{ sessionId, source, choice?, text?, phone_digits? }` | Ack returns `{ ok, session }` |
+| Client → Server | `kiosk.join` | `{ gateId }` | Joins room `gate:{gateId}`; ack may include current display |
+| Server → Client | `checkin.display` | `CheckinDisplay` | Approach B — generic / lpr / sap / submitted |
+| Server → Client | `session.update` | `PublicSession` | Approach A — voice session |
+| Client → Server | `session.input` | `{ sessionId, source, choice?, text?, phone_digits? }` | Approach A ack `{ ok, session }` |
 
-**REST fallback:** `POST /session/:sessionId/input` when socket is disconnected.
+**REST fallback (voice):** `POST /session/:sessionId/input` when socket is disconnected.  
+**REST (check-in):** `GET /checkin/display/:gateId` for polling/initial load.
+
+### CheckinDisplay payload (key fields)
+
+| Field | Description |
+|-------|-------------|
+| `mode` | `generic` \| `lpr` \| `sap` \| `submitted` |
+| `gateId`, `checkinUrl` | Absolute form URL for QR |
+| `customerName`, `plateNumber` | Optional Welcome / plate on glass |
+| `expiresAt`, `token` | Present for token modes |
 
 ### Namespace `/logs` — integration monitoring
 
@@ -325,9 +389,9 @@ HTML clients connect to the **same origin** as the NestJS API (port 3000). Two W
 
 ---
 
-## 8. Kiosk conversation approach
+## 8. Approach A — Kiosk conversation (voice)
 
-The kiosk uses an **explicit server-side state machine** — not a free-form LLM agent. NLU only extracts yes/no and phone digits from STT transcripts; the state machine decides what to ask next.
+The kiosk uses an **explicit server-side state machine** — not a free-form LLM agent. NLU only extracts yes/no and phone digits from STT transcripts; the state machine decides what to ask next. Use **Voice Console** (`/console`) to present this approach.
 
 ![Kiosk state machine](diagrams/04-kiosk-conversation.png)
 
@@ -371,7 +435,48 @@ The kiosk uses an **explicit server-side state machine** — not a free-form LLM
 
 ---
 
+## 8b. Approach B — QR check-in
+
+Drivers confirm on a **mobile form** reached by QR. The kiosk glass shows a large QR and optional Welcome name — no phone number on the glass. Use **QR Console** (`/console/qr`) and the **QR kiosk** (`/`) to present this approach.
+
+![QR check-in sequence](diagrams/12-qr-checkin-sequence.png)
+
+![Check-in ticket lifecycle](diagrams/13-checkin-ticket-lifecycle.png)
+
+![Check-in API and display](diagrams/14-checkin-api-display.png)
+
+### Paths
+
+| Path | Trigger | Form behaviour |
+|------|---------|----------------|
+| **A — Generic QR** | Always on (idle kiosk or printed) | Empty plate / name / phone; `gateId` from query |
+| **B — LPR + SAP miss** | Token mint `source=lpr` | Plate prefilled, **editable**; name/phone empty |
+| **C — LPR + SAP hit** | Token mint `source=sap` | Plate **locked**; name/phone prefilled, editable |
+
+### Settled rules
+
+- Token is an **opaque** Redis id — PII is never in the QR query string
+- TTL **180 seconds**, **single use**, bound to `gateId` + plate
+- Expired/used token → **410**; form falls back to generic for that gate (plate hint kept if LPR still live)
+- Submit → `enqueueFromCheckin`; if `created === false` → **409** already queued (no gate open)
+- New plate → emit `checkin.submitted` → open gate only if `SET NX EX` on `checkin:gate:open:{gateId}` succeeds (~30s)
+- Edited name/phone are **visit-only** — no SAP write-back
+- After enqueue, Module 2 slot-free → WhatsApp/SMS/app claim is **unchanged**
+
+### Redis keys
+
+| Key | Purpose |
+|-----|---------|
+| `checkin:ticket:{token}` | Ticket JSON (TTL 180s) |
+| `checkin:gate:{gateId}` | Current token for kiosk display |
+| `checkin:gate:{gateId}:plate` | Plate hint after expiry |
+| `checkin:gate:open:{gateId}` | Gate-open rate limit (NX EX ~30s) |
+
+---
+
 ## 9. Voice pipeline — STT, NLU, TTS, avatar sync
+
+*(Approach A only — unused on the QR glass path, but required for Voice Console demos.)*
 
 ![Voice and avatar pipeline](diagrams/07-voice-avatar-pipeline.png)
 
@@ -477,7 +582,10 @@ Production: slot availability system webhook or poll (contract TBD).
 |--------|------|---------|
 | GET | `/health` | Health check; reports active TTS/STT adapters |
 | POST | `/lpr/plate-read` | Camera plate ingest |
-| POST | `/session/start` | Manual kiosk session (test without LPR) |
+| GET | `/checkin/display/:gateId` | Current kiosk check-in display (generic or token URL) |
+| GET | `/checkin/tickets/:token` | Prefill payload; **410** if missing/used/expired (`?gateId=` for plate hint) |
+| POST | `/checkin/submit` | `{ token?, gateId, plateNumber, name, phone }` → enqueue; **409** if already queued |
+| POST | `/session/start` | Manual dual start (voice session + SAP-style ticket) for tests |
 | GET | `/session/:id` | Session snapshot |
 | POST | `/session/:id/input` | Touch/STT input (REST fallback) |
 | POST | `/tts` | Text-to-speech `{ text, lang }` → audio bytes |
@@ -491,13 +599,13 @@ Production: slot availability system webhook or poll (contract TBD).
 | GET | `/audit/events?limit=N` | Recent domain-event audit trail |
 | GET | `/demo/config` | Demo config (`claimTimeoutMs`) |
 | POST | `/demo/sap-profile` | Register fake-SAP override for a plate |
-| POST | `/demo/reset` | Clear queue, sessions, LPR, TTS cache, demo, audit |
+| POST | `/demo/reset` | Clear queue, sessions, LPR, check-in, TTS cache, demo, audit |
 
 ### WebSocket namespaces
 
 | Namespace | Events |
 |-----------|--------|
-| `/kiosk` | `kiosk.join`, `session.input`, push `session.update` |
+| `/kiosk` | `kiosk.join`, `session.input`, push `session.update`, push `checkin.display` |
 | `/logs` | `logs.subscribe`, push `logs.backlog` / `logs.line` |
 
 ---
@@ -529,7 +637,10 @@ Validated in `middleware/src/config/env.validation.ts`. Copy `middleware/.env.ex
 | `ELEVENLABS_TTS_OUTPUT_FORMAT` | `mp3_44100_128` | Audio output format |
 | `ELEVENLABS_STT_MODEL_ID` | `scribe_v2` | STT model |
 | `TTS_CACHE_TTL_SECONDS` | `86400` | Redis TTS cache TTL |
-| `CORS_ORIGINS` | localhost URLs | Comma-separated CORS origins |
+| `CORS_ORIGINS` | localhost URLs | Comma-separated CORS origins (include `:3001`) |
+| `CHECKIN_PUBLIC_BASE_URL` | `http://127.0.0.1:3001/checkin` | Absolute URL phones open from QR |
+| `CHECKIN_TOKEN_TTL_SECONDS` | `180` | Opaque ticket TTL |
+| `GATE_OPEN_RATE_LIMIT_SECONDS` | `30` | Max one gate-open per gate in this window |
 | `NLU_ADAPTER` | `rules` | `rules` \| `llm` |
 | `NLU_BASE_URL` | `http://127.0.0.1:11434/v1` | LLM server (Ollama) |
 | `NLU_MODEL` | `qwen3:0.6b` | LLM model name |
@@ -550,12 +661,14 @@ All events are typed in `middleware/src/events/domain-events.ts` and appended to
 | Event | Emitter | Typical listeners |
 |-------|---------|-------------------|
 | `lpr.plate.read` | LPR | SAP |
-| `sap.lookup.found` | SAP | Kiosk |
-| `sap.lookup.not_found` | SAP | Kiosk |
+| `sap.lookup.found` | SAP | Kiosk (mint SAP ticket + start voice session) |
+| `sap.lookup.not_found` | SAP | Kiosk (mint LPR ticket + not_recognized session) |
 | `kiosk.session.started` | Kiosk | Audit |
-| `kiosk.identity.confirmed` | Kiosk | Gate, Queue |
-| `kiosk.phone.captured` | Kiosk | Gate, Queue |
+| `kiosk.identity.confirmed` | Kiosk | Gate, Queue (Approach A) |
+| `kiosk.phone.captured` | Kiosk | Gate, Queue (Approach A) |
 | `kiosk.staff.escalation` | Kiosk | Audit |
+| `checkin.submitted` | Checkin | Audit (gate already opened by service if rate limit OK) |
+| `checkin.display.updated` | Checkin | KioskGateway → `checkin.display` |
 | `gate.open.commanded` | Gate | Audit |
 | `gate.opened` | Gate | Audit |
 | `queue.enqueued` | Queue | Audit |
@@ -581,31 +694,45 @@ All events are typed in `middleware/src/events/domain-events.ts` and appended to
 ```bash
 cd middleware
 cp .env.example .env
+# Set CHECKIN_PUBLIC_BASE_URL to a phone-reachable URL for real-lane demos
 npm install
 docker compose up -d
 npm run start:dev
+
+# other terminal
+cd web && npm install && npm run dev
 ```
 
-### Demo console walkthrough
+### Approach A — Voice Console walkthrough
 
-1. Start middleware: `cd middleware && npm run start:dev` (port 3000)
-2. Start web UI: `cd web && npm run dev` (port 3001)
-3. Open http://127.0.0.1:3001/console
-4. **Connect** to middleware URL (`http://127.0.0.1:3000`)
-5. **Save SAP profile** — plate `ABC 1234`, name, phone
-6. **Send LPR plate read** — same plate
-7. Avatar greets on kiosk panel → click **Yes** or hold-to-speak
-8. **Set available slots** → **Free batch**
-9. **WhatsApp confirm** for the notified entry
-10. Watch **audit timeline** and open http://127.0.0.1:3001/logs for integration trace
+1. Open http://127.0.0.1:3001/console
+2. **Connect** to middleware (`http://127.0.0.1:3000`)
+3. **Save SAP profile** — plate, name, phone
+4. **Send LPR plate read** — same plate
+5. Avatar greets → click **Yes** or hold-to-speak
+6. **Set available slots** → **Free batch**
+7. **WhatsApp confirm** → watch audit timeline
 
-### Automated proof
+### Approach B — QR Console walkthrough
+
+1. Open http://127.0.0.1:3001/console/qr (and optionally kiosk at `/`)
+2. **Connect** → **Save SAP** → **Send LPR plate**
+3. Check-in QR appears (Welcome name on SAP hit)
+4. **Open check-in form** → confirm/edit fields → **Join queue**
+5. Queue row appears → Free slot → WhatsApp confirm (same as Approach A from here)
+
+Reset between demos if reusing the same plate: **Reset demo run**.
+
+### Automated proof (Approach B)
 
 ```bash
 cd middleware
 npm test
-bash scripts/prove_flow.sh http://127.0.0.1:3000
+npm run prove
+# or: bash scripts/prove_flow.sh http://127.0.0.1:3000
 ```
+
+Proof path: reset → seed SAP → LPR → `GET /checkin/display` → submit → 409 duplicate check → slot freed → WhatsApp confirm.
 
 ---
 
@@ -620,7 +747,8 @@ The following items are **designed** (see solution design and presentation) but 
 | WhatsApp Business Cloud | Authoritative claim webhook | Stub + HTTP simulate confirm |
 | Slot availability webhook | Automatic slot-free events | Manual `POST /slots/freed` |
 | LPR vendor adapter | Camera-specific protocol | HTTP ingest DTO only |
-| Android kiosk shell | Kiosk-mode lockdown + WebView | Browser UI only |
+| Android kiosk shell | Kiosk-mode lockdown + WebView | Browser UI only (QR or voice) |
+| Public lane check-in URL | Phone-reachable HTTPS for QR | Default localhost for demos |
 | PostgreSQL audit | Durable history | Redis stream only |
 | On-prem voice (Vosk/Piper) | Air-gapped branch option | ElevenLabs cloud (Option B shipped) |
 | Arabic voice UI | Phase 2 bilingual avatar | Scaffolded, disabled |
@@ -632,10 +760,12 @@ The following items are **designed** (see solution design and presentation) but 
 
 These decisions from the executive presentation remain open and block production integration:
 
-1. **Kiosk platform** — Windows, Ubuntu, Android kiosk shell, or TBD?
-2. **AI voice strategy** — Hosted APIs (current ElevenLabs path) vs full on-prem STT/TTS vs hybrid?
-3. **Slot availability contract** — Webhook push vs polling from the slot system owner?
-4. **LPR read failure** — Treat as "not a client" (gate closed) vs retry vs route to staff?
+1. **Production Module 1 preference** — Voice avatar (Approach A), QR check-in (Approach B), or both in parallel per gate?
+2. **Kiosk platform** — Windows, Ubuntu, Android kiosk shell, or TBD?
+3. **AI voice strategy** (if Approach A) — Hosted APIs (current ElevenLabs path) vs full on-prem STT/TTS vs hybrid?
+4. **Public check-in base URL** (Approach B) — Phone-reachable HTTPS origin for QR links in the lane (not localhost)
+5. **Slot availability contract** — Webhook push vs polling from the slot system owner?
+6. **LPR read failure** — Generic QR only vs retry vs route to staff?
 
 ### Blockers to start production integrations
 
@@ -644,6 +774,7 @@ These decisions from the executive presentation remain open and block production
 - Slot system owner and API shape
 - WhatsApp Business Cloud account and webhook URL
 - On-prem server provisioning and pilot gate selection
+- Decision on Approach A vs B (or dual) for the pilot gate
 
 ---
 
@@ -658,16 +789,20 @@ npx -y @mermaid-js/mermaid-cli -i <file>.mmd -o <file>.png -b white -p puppeteer
 
 | File | Description |
 |------|-------------|
-| `01-system-context.mmd` | C4 system context |
-| `02-containers.mmd` | C4 container diagram |
-| `03-end-to-end-flow.mmd` | Full visit and queue flow |
-| `04-kiosk-conversation.mmd` | Kiosk state machine |
-| `05-known-customer-sequence.mmd` | Happy path sequence |
-| `06-driver-not-owner-sequence.mmd` | Visit phone capture sequence |
-| `07-voice-avatar-pipeline.mmd` | STT/TTS/avatar sequence |
-| `08-socket-html-backend.mmd` | Socket.io namespaces |
-| `09-queue-claim-flow.mmd` | Queue notify and claim |
+| `01-system-context.mmd` | C4 system context (voice + QR phone) |
+| `02-containers.mmd` | C4 container diagram (Next UIs + CheckinModule) |
+| `03-end-to-end-flow.mmd` | Approach A — voice visit + shared queue |
+| `04-kiosk-conversation.mmd` | Approach A — kiosk state machine |
+| `05-known-customer-sequence.mmd` | Approach A — happy path sequence |
+| `06-driver-not-owner-sequence.mmd` | Approach A — visit phone capture |
+| `07-voice-avatar-pipeline.mmd` | Approach A — STT/TTS/avatar |
+| `08-socket-html-backend.mmd` | Socket.io: `session.update` + `checkin.display` |
+| `09-queue-claim-flow.mmd` | Queue notify and claim (shared Module 2) |
 | `10-adapter-seams.mmd` | Adapter port diagram |
+| `11-dual-entry-approaches.mmd` | Side-by-side Approach A vs B |
+| `12-qr-checkin-sequence.mmd` | Approach B — generic / LPR / SAP paths |
+| `13-checkin-ticket-lifecycle.mmd` | Opaque token mint / TTL / single use |
+| `14-checkin-api-display.mmd` | Check-in HTTP + socket display |
 
 ---
 

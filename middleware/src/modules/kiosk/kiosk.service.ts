@@ -12,6 +12,7 @@ import type {
   SapLookupFoundPayload,
   SapLookupNotFoundPayload,
 } from '../../events/domain-events';
+import { CheckinService } from '../checkin/checkin.service';
 import { LprService } from '../lpr/lpr.service';
 import { KioskGateway } from './kiosk.gateway';
 import { SessionStore } from './session.store';
@@ -23,6 +24,10 @@ import {
 } from './state-machine';
 import type { PublicSession, SessionInput } from './state-machine';
 
+/**
+ * Dual demo path: mint QR check-in tickets AND start voice sessions
+ * so Voice Console and QR Console can both be presented.
+ */
 @Injectable()
 export class KioskService {
   constructor(
@@ -31,6 +36,7 @@ export class KioskService {
     @Inject(forwardRef(() => KioskGateway))
     private readonly gateway: KioskGateway,
     private readonly lpr: LprService,
+    private readonly checkin: CheckinService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(KioskService.name);
@@ -38,6 +44,13 @@ export class KioskService {
 
   @OnEvent(DomainEvents.SapLookupFound)
   async onSapFound(payload: SapLookupFoundPayload): Promise<void> {
+    await this.checkin.mintFromSap({
+      gateId: payload.gateId,
+      plateNumber: payload.plateNumber,
+      profile: payload.profile,
+      correlationId: payload.correlationId,
+    });
+
     const session = createSession({
       sessionId: randomUUID(),
       gateId: payload.gateId,
@@ -69,13 +82,20 @@ export class KioskService {
 
   @OnEvent(DomainEvents.SapLookupNotFound)
   async onSapNotFound(payload: SapLookupNotFoundPayload): Promise<void> {
+    // QR path: keep plate active and mint editable-plate ticket.
+    await this.checkin.mintFromLpr({
+      gateId: payload.gateId,
+      plateNumber: payload.plateNumber,
+      correlationId: payload.correlationId,
+    });
+
+    // Voice path: show not-recognized on avatar console (do not clearActive).
     const session = createNotRecognizedSession({
       sessionId: randomUUID(),
       gateId: payload.gateId,
       plateNumber: payload.plateNumber,
     });
     await this.store.save(session);
-    await this.lpr.clearActive(payload.plateNumber);
     const pub = toPublic(session);
     this.gateway.pushSession(session.gateId, pub);
     this.logger.info(
@@ -133,7 +153,7 @@ export class KioskService {
     return pub;
   }
 
-  /** Manual start for testing without LPR (uses fake profile). */
+  /** Manual start for voice testing without LPR (also mints a QR ticket). */
   async startManual(
     gateId: string,
     correlationId?: string,
