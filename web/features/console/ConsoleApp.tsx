@@ -21,6 +21,14 @@ import {
   type SessionInputPayload,
 } from "@/lib/types";
 
+function cleanSpeechText(raw: string): string {
+  return raw
+    .replace(/\[[^\]]+\]/g, '')
+    .replace(/\.{2,}/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function ConsoleApp() {
   const api = useMemo(() => createMwApi(), []);
   const avatarRef = useRef<KioskAvatarHandle>(null);
@@ -96,17 +104,73 @@ export function ConsoleApp() {
       if (!text) return;
       speakingRef.current = true;
       avatarRef.current?.setState("talking");
+      setRecordStatus("Generating speech…");
       try {
         api.setBaseUrl(middlewareUrl);
         const { buffer, contentType } = await api.tts(text, lang);
-        const audioEl = audioRef.current;
-        if (!audioEl) return;
-        await avatarRef.current?.playAndLipSync(buffer, audioEl, contentType);
+        
+        // If buffer is tiny (<= 100 bytes), it's the silent fallback stub from middleware
+        if (buffer.byteLength <= 100) {
+          setRecordStatus("Playing voice (browser speech engine)…");
+          if (typeof window !== "undefined" && "speechSynthesis" in window) {
+            avatarRef.current?.setState("talking");
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(cleanSpeechText(text));
+            utterance.lang = lang === "ar" ? "ar-SA" : "en-US";
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            await new Promise<void>((resolve) => {
+              utterance.onend = () => {
+                avatarRef.current?.setState("idle");
+                resolve();
+              };
+              utterance.onerror = () => {
+                avatarRef.current?.setState("idle");
+                resolve();
+              };
+              window.speechSynthesis.speak(utterance);
+            });
+          }
+          setRecordStatus("");
+        } else {
+          setRecordStatus("Playing voice (ElevenLabs)…");
+          const audioEl = audioRef.current;
+          if (audioEl) {
+            await avatarRef.current?.playAndLipSync(buffer, audioEl, contentType);
+          }
+          setRecordStatus("");
+        }
       } catch (err) {
         setSessionStatus(
-          `TTS error: ${err instanceof Error ? err.message : String(err)}. Is middleware running at ${api.getBaseUrl()}?`,
+          `ElevenLabs TTS unavailable (${err instanceof Error ? err.message : String(err)}). Using browser speech synthesis fallback…`,
         );
-        avatarRef.current?.setState("idle");
+        setRecordStatus("Playing voice (browser speech engine)…");
+        if (typeof window !== "undefined" && "speechSynthesis" in window) {
+          try {
+            avatarRef.current?.setState("talking");
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(cleanSpeechText(text));
+            utterance.lang = lang === "ar" ? "ar-SA" : "en-US";
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            await new Promise<void>((resolve) => {
+              utterance.onend = () => {
+                avatarRef.current?.setState("idle");
+                resolve();
+              };
+              utterance.onerror = () => {
+                avatarRef.current?.setState("idle");
+                resolve();
+              };
+              window.speechSynthesis.speak(utterance);
+            });
+          } catch {
+            avatarRef.current?.setState("idle");
+          }
+        } else {
+          avatarRef.current?.setState("idle");
+        }
+        setRecordStatus("");
       } finally {
         speakingRef.current = false;
       }
@@ -454,11 +518,29 @@ export function ConsoleApp() {
                   gateId: gateId.trim() || "gate-1",
                   plateNumber: lprPlate.trim(),
                 });
-                setLprStatus(
-                  result.accepted
-                    ? `Accepted plate ${result.plateNumber} — waiting for SAP → session push…`
-                    : `Rejected: ${result.reason || "deduped"} (reset demo if plate still active)`,
-                );
+                if (!result.accepted && result.reason === "already_queued_or_active") {
+                  setLprStatus("Plate was active from previous run — resetting plate lock & re-sending…");
+                  await api.saveSapProfile({
+                    plateNumber: sapPlate.trim(),
+                    name: sapName.trim(),
+                    phone: sapPhone.trim(),
+                  });
+                  const retry = await api.plateRead({
+                    gateId: gateId.trim() || "gate-1",
+                    plateNumber: lprPlate.trim(),
+                  });
+                  setLprStatus(
+                    retry.accepted
+                      ? `Accepted plate ${retry.plateNumber} — waiting for SAP → session push…`
+                      : `Rejected: ${retry.reason || "deduped"}`,
+                  );
+                } else {
+                  setLprStatus(
+                    result.accepted
+                      ? `Accepted plate ${result.plateNumber} — waiting for SAP → session push…`
+                      : `Rejected: ${result.reason || "deduped"} (click Reset demo run if stuck)`,
+                  );
+                }
                 setTimeout(() => void refreshAll(), 400);
               }}
             >

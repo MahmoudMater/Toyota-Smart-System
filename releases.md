@@ -1,5 +1,47 @@
 # Releases
 
+## [2026-08-29 14:05] Fix voice playback when pressing send plate read
+
+**By:** @MahmoudMater
+
+**Requested:** The voice is not playing when I press on send plate read - why is that so and fix it
+
+**Changes:**
+- Middleware `ElevenLabsClient`: Stopped retrying 401/402 quota exceeded errors (4 exponential backoff attempts previously stalled the response for ~4 seconds)
+- Middleware `TtsService`: Added graceful fallback to `StubTtsAdapter` when the upstream provider fails so HTTP 200 is returned immediately
+- Middleware `DemoService`: Cleared `lpr:active:<plate>` lock whenever a SAP profile is saved or updated
+- Web `ConsoleApp.tsx`: Automatic cleanup of speech markers (`[warmly]`, `...`) and seamless fallback to the browser's native Speech Synthesis API when ElevenLabs quota is depleted, ensuring voice playback and avatar talking animation always trigger
+
+**Notes:** If you add credits to your ElevenLabs account or supply a new key with remaining quota, the system will automatically use ElevenLabs; otherwise, it seamlessly uses the browser speech engine.
+
+## [2026-08-29 14:00] Fix Voice and Session Flow with ElevenLabs
+
+**By:** @MahmoudMater
+
+**Requested:** Trace the flow of the voice and connecting to elevenlabs and fix the broken visit session and voice playback
+
+**Changes:**
+- Updated ElevenLabs model IDs to valid identifiers (`eleven_multilingual_v2` for TTS and `scribe_v1` for STT) in `middleware/.env`, `middleware/src/config/env.validation.ts`, and `middleware/.env.example`
+- Cleaned up duplicated `CORS_ORIGINS` in `middleware/.env`
+- Added `getActiveSessionForGate` in `middleware/src/modules/kiosk/kiosk.service.ts` and pushed active gate session on `kiosk.join` socket connections in `middleware/src/modules/kiosk/kiosk.gateway.ts`
+- Added browser Web Speech synthesis fallback in `web/features/console/ConsoleApp.tsx` if ElevenLabs quota is exceeded
+- Enhanced `web/components/avatar/KioskAvatar.tsx` audio playback lifecycle with robust error and termination handling
+
+**Notes:** If the ElevenLabs key exceeds its credit quota, the Voice Console now smoothly falls back to browser speech synthesis so the avatar voice and visit session remain operational.
+
+## [2026-08-29 13:51] Fix NotFoundError Node.removeChild in logs view
+
+**By:** @MahmoudMater
+
+**Requested:** Fix Node.removeChild NotFoundError runtime crash on /logs
+
+**Changes:**
+- Removed manual `logViewRef.current.innerHTML = ""` DOM clearing on tab change/subscription in `web/features/logs/LogsApp.tsx`
+- Preserved React DOM reconciliation control over log viewer container children
+- Refactored pause state handling to use `pausedRef` so toggling pause does not tear down socket connections
+
+**Notes:** React was encountering a `NotFoundError` on unmounting child elements because `innerHTML = ""` had deleted the DOM elements out from under React's virtual DOM.
+
 ## [2026-08-26 19:46] Client docs: append QR check-in (dual approach)
 
 **By:** @MahmoudMater

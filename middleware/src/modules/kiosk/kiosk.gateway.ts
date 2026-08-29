@@ -58,7 +58,11 @@ export class KioskGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
     const display = await this.checkin.getDisplay(gateId);
     client.emit('checkin.display', display);
-    return { ok: true, gateId, room, display };
+    const session = await this.kioskService.getActiveSessionForGate(gateId);
+    if (session) {
+      client.emit('session.update', session);
+    }
+    return { ok: true, gateId, room, display, session };
   }
 
   @SubscribeMessage('session.input')

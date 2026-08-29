@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import Redis from 'ioredis';
@@ -8,6 +8,7 @@ import { REDIS_CLIENT } from '../../redis/redis.constants';
 import { IntegrationLogService } from '../integration-log/integration-log.service';
 import type { SpeechSynthesizer, SynthesizeResult } from './speech.synthesizer';
 import { SPEECH_SYNTHESIZER } from './speech.synthesizer';
+import { StubTtsAdapter } from './stub-tts.adapter';
 
 const CACHE_PREFIX = 'tts:cache:';
 
@@ -15,6 +16,7 @@ const CACHE_PREFIX = 'tts:cache:';
 export class TtsService {
   constructor(
     @Inject(SPEECH_SYNTHESIZER) private readonly synthesizer: SpeechSynthesizer,
+    @Optional() private readonly stub: StubTtsAdapter,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
     private readonly config: ConfigService<Env, true>,
     private readonly logger: PinoLogger,
@@ -71,14 +73,30 @@ export class TtsService {
       chars: trimmed.length,
       text: trimmed,
     });
-    const result = await this.synthesizer.synthesize(trimmed, lang);
-    await this.redis.set(key, result.audio, 'EX', this.cacheTtl());
-    this.integrationLog.event('tts', 'tts.synthesize.done', {
-      adapter: this.synthesizer.adapterName,
-      bytes: result.audio.length,
-      contentType: result.contentType,
-    });
-    return result;
+
+    try {
+      const result = await this.synthesizer.synthesize(trimmed, lang);
+      await this.redis.set(key, result.audio, 'EX', this.cacheTtl());
+      this.integrationLog.event('tts', 'tts.synthesize.done', {
+        adapter: this.synthesizer.adapterName,
+        bytes: result.audio.length,
+        contentType: result.contentType,
+      });
+      return result;
+    } catch (err) {
+      this.logger.warn(
+        { err: (err as Error)?.message ?? String(err) },
+        'tts.synthesizer.fallback_to_stub',
+      );
+      this.integrationLog.event('tts', 'tts.synthesize.fallback', {
+        adapter: 'stub',
+        error: (err as Error)?.message ?? String(err),
+      });
+      if (this.stub) {
+        return this.stub.synthesize(trimmed, lang);
+      }
+      throw err;
+    }
   }
 
   async purge(): Promise<number> {

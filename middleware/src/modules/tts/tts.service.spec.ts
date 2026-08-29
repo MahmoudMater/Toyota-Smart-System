@@ -73,9 +73,11 @@ function fakeIntegrationLog() {
 
 function createService() {
   const synth = new FakeSynthesizer();
+  const stub = new FakeSynthesizer() as any;
   const redis = new FakeRedis();
   const service = new TtsService(
     synth,
+    stub,
     redis as any,
     fakeConfig(),
     fakeLogger(),

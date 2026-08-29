@@ -168,34 +168,38 @@ export const KioskAvatar = forwardRef<KioskAvatarHandle, KioskAvatarProps>(
         const url = URL.createObjectURL(blob);
         audioEl.src = url;
 
-        ensureGraph(audioEl);
-        if (audioCtxRef.current?.state === "suspended") {
-          await audioCtxRef.current.resume();
-        }
-
-        const analyser = analyserRef.current!;
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        const tick = () => {
-          analyser.getByteTimeDomainData(data);
-          let sum = 0;
-          for (let i = 0; i < data.length; i++) {
-            const v = (data[i] - 128) / 128;
-            sum += v * v;
+        try {
+          ensureGraph(audioEl);
+          if (audioCtxRef.current?.state === "suspended") {
+            await audioCtxRef.current.resume();
           }
-          const rms = Math.sqrt(sum / data.length);
-          implRef.current?.setMouthOpen(Math.min(1, rms * 6));
-          lipSyncRafRef.current = requestAnimationFrame(tick);
-        };
-        cancelAnimationFrame(lipSyncRafRef.current);
-        lipSyncRafRef.current = requestAnimationFrame(tick);
 
-        await audioEl.play();
-        await new Promise<void>((resolve) => {
-          audioEl.onended = () => resolve();
-        });
-        cancelAnimationFrame(lipSyncRafRef.current);
-        implRef.current?.setMouthOpen(0);
-        URL.revokeObjectURL(url);
+          const analyser = analyserRef.current!;
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          const tick = () => {
+            analyser.getByteTimeDomainData(data);
+            let sum = 0;
+            for (let i = 0; i < data.length; i++) {
+              const v = (data[i] - 128) / 128;
+              sum += v * v;
+            }
+            const rms = Math.sqrt(sum / data.length);
+            implRef.current?.setMouthOpen(Math.min(1, rms * 6));
+            lipSyncRafRef.current = requestAnimationFrame(tick);
+          };
+          cancelAnimationFrame(lipSyncRafRef.current);
+          lipSyncRafRef.current = requestAnimationFrame(tick);
+
+          await audioEl.play();
+          await new Promise<void>((resolve, reject) => {
+            audioEl.onended = () => resolve();
+            audioEl.onerror = () => reject(new Error("Audio playback error"));
+          });
+        } finally {
+          cancelAnimationFrame(lipSyncRafRef.current);
+          implRef.current?.setMouthOpen(0);
+          URL.revokeObjectURL(url);
+        }
       },
       [ensureGraph, setState],
     );

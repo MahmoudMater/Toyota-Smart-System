@@ -109,6 +109,11 @@ export class KioskService {
     return session ? toPublic(session) : null;
   }
 
+  async getActiveSessionForGate(gateId: string): Promise<PublicSession | null> {
+    const session = await this.store.getActiveForGate(gateId);
+    return session ? toPublic(session) : null;
+  }
+
   async handleSessionInput(
     sessionId: string,
     input: SessionInput,

@@ -27,6 +27,7 @@ export function LogsApp() {
   const logViewRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<Socket | null>(null);
   const integrationRef = useRef("all");
+  const pausedRef = useRef(false);
 
   const [middlewareUrl, setMiddlewareUrl] = useState(() => {
     if (typeof window !== "undefined") {
@@ -46,6 +47,10 @@ export function LogsApp() {
     integrationRef.current = integration;
   }, [integration]);
 
+  useEffect(() => {
+    pausedRef.current = paused;
+  }, [paused]);
+
   const matchesFilter = useCallback(
     (line: LogLine) => {
       if (!filter) return true;
@@ -63,9 +68,6 @@ export function LogsApp() {
   const subscribe = useCallback((name: string) => {
     setIntegration(name);
     setLines([]);
-    if (logViewRef.current) {
-      logViewRef.current.innerHTML = "";
-    }
     socketRef.current?.emit("logs.subscribe", { integration: name });
   }, []);
 
@@ -89,10 +91,10 @@ export function LogsApp() {
       },
     );
     socket.on("logs.line", (line: LogLine) => {
-      if (paused) return;
+      if (pausedRef.current) return;
       setLines((prev) => {
         const next = [...prev, line];
-        if (next.length > 2000) next.splice(0, next.length - 2000);
+        if (next.length > 2000) return next.slice(-2000);
         return next;
       });
     });
@@ -101,7 +103,7 @@ export function LogsApp() {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [api, middlewareUrl, paused]);
+  }, [api, middlewareUrl]);
 
   useEffect(() => {
     scrollToBottom();

@@ -38,6 +38,8 @@ export class DemoService {
       plate,
     };
     await this.redis.set(DEMO_SAP_KEY(plate), JSON.stringify(profile));
+    await this.lprService.clearActive(plate);
+    await this.lprService.clearActive(dto.plateNumber);
     this.logger.info({ plate, name: profile.name }, 'demo.sap_profile.saved');
     return profile;
   }

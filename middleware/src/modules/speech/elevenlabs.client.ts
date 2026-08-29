@@ -26,10 +26,11 @@ function sleep(ms: number): Promise<void> {
 }
 
 function isRetryableBody(status: number, body: string): boolean {
+  if (status === 401 || status === 402 || status === 403) return false;
   if (status === 429) return true;
   if (!RETRYABLE_STATUSES.has(status)) return false;
-  // Don't retry hard auth / payment errors that sometimes arrive as 503 wrappers.
-  if (/payment_required|unauthorized|invalid_api_key/i.test(body)) return false;
+  // Don't retry hard auth / payment / quota errors that sometimes arrive as 503 wrappers.
+  if (/payment_required|unauthorized|invalid_api_key|quota|credit/i.test(body)) return false;
   return true;
 }
 
